@@ -499,6 +499,25 @@ function renderMsgs(){
       +'</div>';
   }
   el.innerHTML=html;
+  // Add game button events
+  el.querySelectorAll(".gacc").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var mid=btn.getAttribute("data-mid");
+      acceptGame(mid);
+    });
+  });
+  el.querySelectorAll(".grej").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var mid=btn.getAttribute("data-mid");
+      rejectGame(mid);
+    });
+  });
+  // Add voice play events
+  el.querySelectorAll(".vplay").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      playVoice(btn.getAttribute("data-url"),btn);
+    });
+  });
 }
 function scrollD(){var el=G("msgs-area");if(el){el.scrollTop=el.scrollHeight;}}
 function subChat(cid){
