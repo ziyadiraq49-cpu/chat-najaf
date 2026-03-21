@@ -326,12 +326,14 @@ const $=id=>document.getElementById(id);
 var CU=null,convs=[],curConv=null,replyTo=null,msgSub=null,convSub=null,allProfiles=[];
 
 // ── INIT ──
-(async()=>{
-  var s=await sb.auth.getSession();
-  if(s.data?.session) await launch(s.data.session.user);
+(async function(){
+  try{
+    var s=await sb.auth.getSession();
+    if(s.data&&s.data.session&&s.data.session.user) await launch(s.data.session.user);
+  }catch(e){}
 })();
-sb.auth.onAuthStateChange(async(ev,sess)=>{
-  if(ev==="SIGNED_IN"&&sess) await launch(sess.user);
+sb.auth.onAuthStateChange(async function(ev,sess){
+  if(ev==="SIGNED_IN"&&sess&&sess.user) await launch(sess.user);
   else if(ev==="SIGNED_OUT"){CU=null;showAuth();}
 });
 
@@ -354,7 +356,7 @@ async function doLogin(){
   var r=await sb.auth.signInWithPassword({email:em,password:pw});
   setBtn("l-btn",false,"دخول");
   if(r.error){showErr("l-err","بيانات غير صحيحة");return;}
-  if(r.data?.user) await launch(r.data.user);
+  if(r.data&&r.data.user) await launch(r.data.user);
 }
 async function doReg(){
   var nm=$("r-nm").value.trim(),em=$("r-em").value.trim(),pw=$("r-pw").value,pw2=$("r-pw2").value;
@@ -366,7 +368,7 @@ async function doReg(){
   setBtn("r-btn",false,"إنشاء حساب");
   if(r.error){showErr("r-err",r.error.message);return;}
   await sb.from("profiles").upsert({id:r.data.user.id,full_name:nm,email:em});
-  if(r.data?.user) await launch(r.data.user);
+  if(r.data&&r.data.user) await launch(r.data.user);
 }
 async function doLogout(){
   if(!confirm("تسجيل الخروج؟"))return;
@@ -378,14 +380,16 @@ async function doLogout(){
 // ── LAUNCH ──
 async function launch(user){
   CU=user;
-  var nm=(user.user_metadata?.full_name||user.email||"").charAt(0).toUpperCase();
+  var meta=user.user_metadata||{};
+  var fullName=meta.full_name||"";
+  var nm=(fullName||user.email||"مستخدم").charAt(0).toUpperCase();
   $("user-av").textContent=nm;
   $("user-av").title="تسجيل الخروج";
-  await sb.from("profiles").upsert({id:user.id,full_name:user.user_metadata?.full_name||"",email:user.email});
+  try{await sb.from("profiles").upsert({id:user.id,full_name:fullName,email:user.email});}catch(e){}
   showApp();
-  await loadConvs();
-  subscribeConvs();
-  await loadAllProfiles();
+  try{await loadConvs();}catch(e){}
+  try{subscribeConvs();}catch(e){}
+  try{await loadAllProfiles();}catch(e){}
   // Admin check: 5 taps on avatar
   var taps=0,timer;
   $("user-av").addEventListener("click",()=>{
@@ -413,10 +417,10 @@ async function loadConvs(){
 function renderConvList(){
   var el=$("conv-list");el.innerHTML="";
   var q=($("conv-search")||{value:""}).value.toLowerCase();
-  var list=q?convs.filter(c=>{var oid=c.user1_id===CU.id?c.user2_id:c.user1_id;var p=getProfile(oid);return (p.full_name||"").toLowerCase().includes(q);}):convs;
+  var list=q?convs.filter(c=>{var oid=(c.user1_id===CU.id?c.user2_id:c.user1_id);var p=getProfile(oid);return (p.full_name||"").toLowerCase().includes(q);}):convs;
   if(!list.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--dim);font-size:13px">لا توجد محادثات بعد</div>';return;}
   list.forEach(c=>{
-    var otherId=c.user1_id===CU.id?c.user2_id:c.user1_id;
+    var otherId=(c.user1_id===CU.id?c.user2_id:c.user1_id);
     var p=getProfile(otherId);
     var nm=p.full_name||p.email||"مستخدم";
     var col=getColor(otherId);
@@ -435,8 +439,8 @@ function filterConvs(){renderConvList();}
 
 function subscribeConvs(){
   convSub=sb.channel("convs-"+CU.id)
-    .on("postgres_changes",{event:"*",schema:"public",table:"conversations",filter:`user1_id=eq.${CU.id}`},()=>loadConvs())
-    .on("postgres_changes",{event:"*",schema:"public",table:"conversations",filter:`user2_id=eq.${CU.id}`},()=>loadConvs())
+    .on("postgres_changes",{event:"*",schema:"public",table:"conversations",filter:"user1_id=eq."+CU.id},function(){loadConvs();})
+    .on("postgres_changes",{event:"*",schema:"public",table:"conversations",filter:"user2_id=eq."+CU.id},function(){loadConvs();})
     .subscribe();
 }
 
@@ -495,7 +499,7 @@ function renderMsgs(){
     // Content
     var contentHtml="";
     if(m.file_url){
-      if(m.file_type?.startsWith("image/")){contentHtml=`<img class="msg-img" src="${m.file_url}" onclick="openImg('${m.file_url}')" loading="lazy">`;}
+      if(m.file_type&&m.file_type.startsWith("image/")){contentHtml=`<img class="msg-img" src="${m.file_url}" onclick="openImg('${m.file_url}')" loading="lazy">`;}
       else{contentHtml=`<a class="msg-file" href="${m.file_url}" target="_blank" download><span class="msg-file-icon">📎</span><div><div class="msg-file-name">${m.file_name||"ملف"}</div><div class="msg-file-size">${m.file_size||""}</div></div></a>`;}
     }
     if(m.content)contentHtml+=`<div class="msg-text">${escHtml(m.content)}</div>`;
@@ -518,7 +522,7 @@ function subscribeChat(convId){
   if(msgSub)sb.removeChannel(msgSub);
   msgSub=sb.channel("msgs-"+convId)
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${convId}`},async(p)=>{
-      var newMsg=p.new;
+      var newMsg=p.new||{};
       if(!msgs.find(m=>m.id===newMsg.id)){msgs.push(newMsg);renderMsgs();scrollBottom();}
       if(newMsg.sender_id!==CU.id){await sb.from("messages").update({is_read:true}).eq("id",newMsg.id);}
     })
@@ -660,7 +664,7 @@ async function openAdmConv(conv,title){
   // Subscribe
   if(admMsgSub)sb.removeChannel(admMsgSub);
   admMsgSub=sb.channel("adm-"+conv.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${conv.id}`},p=>{
-    var m=p.new;var row=document.createElement("div");row.className="msg-row "+(m.sender_id===conv.user1_id?"other":"me");row.innerHTML=`<div class="msg-bubble"><div class="msg-text">${escHtml(m.content||"📎")}</div></div>`;
+    var m=p.new||{};var row=document.createElement("div");row.className="msg-row "+(m.sender_id===conv.user1_id?"other":"me");row.innerHTML=`<div class="msg-bubble"><div class="msg-text">${escHtml(m.content||"📎")}</div></div>`;
     mw.appendChild(row);mw.scrollTop=mw.scrollHeight;
   }).subscribe();
 }
