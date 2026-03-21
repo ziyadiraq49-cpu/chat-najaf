@@ -1395,26 +1395,30 @@ function findOrCreateGame(gameType,extraData,cb){
 // ── XO GAME ──
 var xoSession=null,xoSub=null,xoMySymbol="";
 function openXO(challengerId){
-  xoMySymbol=CU.id===challengerId?"X":"O";
-  document.getElementById("xo-my-sym").textContent=xoMySymbol==="X"?"❌":"⭕";
-  document.getElementById("xo-op-sym").textContent=xoMySymbol==="X"?"⭕":"❌";
   document.getElementById("xo-modal").classList.add("open");
+  document.getElementById("xo-status").textContent="⏳ جاري التحميل...";
   findOrCreateGame("xo",{},function(s,isHost){
     if(!s){T("تعذر إنشاء جلسة اللعبة");return;}
     xoSession=s;
+    // Symbol based on player position in session
+    xoMySymbol=s.player1_id===CU.id?"X":"O";
+    document.getElementById("xo-my-sym").textContent=xoMySymbol==="X"?"❌":"⭕";
+    document.getElementById("xo-op-sym").textContent=xoMySymbol==="X"?"⭕":"❌";
     renderXO();
     subGame(s.id,function(updated){
       xoSession=updated;
+      // Recalculate symbol in case session updated
+      xoMySymbol=updated.player1_id===CU.id?"X":"O";
       renderXO();
       if(updated.status==="finished"){
         var st=document.getElementById("xo-status");
         if(updated.winner===CU.id)st.textContent="🏆 أنت الفائز!";
         else if(updated.winner==="draw")st.textContent="🤝 تعادل!";
         else st.textContent="😔 خسرت!";
+        if(updated.winner&&updated.winner!==CU.id)playNotifSound();
       }
     });
   });
-  document.getElementById("xo-modal").classList.add("open");
 }
 
 function renderXO(){
@@ -1477,7 +1481,13 @@ function checkXOWin(b){
 
 function restartXO(){
   if(!xoSession)return;
-  SB.from("game_sessions").update({board:["","","","","","","","",""],current_turn:xoSession.player1_id,status:"playing",winner:null,updated_at:new Date().toISOString()}).eq("id",xoSession.id).then(function(){});
+  SB.from("game_sessions").update({
+    board:["","","","","","","","",""],
+    current_turn:xoSession.player1_id,
+    status:"playing",
+    winner:null,
+    updated_at:new Date().toISOString()
+  }).eq("id",xoSession.id).then(function(){T("🔄 جولة جديدة!");});
 }
 function closeXO(){
   if(gameSub){SB.removeChannel(gameSub);gameSub=null;}
@@ -1815,28 +1825,34 @@ function sendDareResult(){
 // ── NOTIFICATION SOUND ──
 var _audioCtx=null;
 function initNotifSound(){
-  // Initialize on first user interaction
-  var events=["click","touchstart","keydown"];
-  function init(){
+  // Try to create audio context on any user interaction
+  function tryInit(){
+    if(_audioCtx)return;
     try{
       _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-      if(_audioCtx.state==="suspended")_audioCtx.resume();
-    }catch(e){}
-    events.forEach(function(ev){document.removeEventListener(ev,init);});
+    }catch(e){_audioCtx=null;}
   }
-  events.forEach(function(ev){document.addEventListener(ev,init,{once:true});});
+  document.addEventListener("touchstart",tryInit,{once:false,passive:true});
+  document.addEventListener("click",tryInit,{once:false,passive:true});
 }
 function playNotifSound(){
+  // Method 1: Web Audio API
   try{
-    if(!_audioCtx){
-      _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-    }
+    if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
     if(_audioCtx.state==="suspended"){
       _audioCtx.resume().then(function(){_doPlaySound();});
-      return;
+    }else{
+      _doPlaySound();
     }
-    _doPlaySound();
-  }catch(e){console.log("Audio error:",e);}
+    return;
+  }catch(e){}
+  // Method 2: HTML Audio with data URI (beep sound)
+  try{
+    var a=new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAA"+
+      "EAAQAoIwAAoiMAABAAIABkYXRhSAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"+
+      "EAAQACAAQACAAMABIAFABUAFAASAA8ADAAJAAYADAAQACAAQACAAQACAAQACAAQAC");
+    a.volume=0.5;a.play().catch(function(){});
+  }catch(e){}
 }
 function _doPlaySound(){
   try{
