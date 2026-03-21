@@ -305,6 +305,7 @@ function openChat(conv){
 }
 function goBack(){
   if(MCH){SB.removeChannel(MCH);MCH=null;}
+  if(window._pollTimer){clearInterval(window._pollTimer);window._pollTimer=null;}
   CONV=null;showPage("pg-list");loadConvs();
 }
 
@@ -346,9 +347,19 @@ function subChat(cid){
   if(MCH)SB.removeChannel(MCH);
   MCH=SB.channel("mc"+cid).on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"conversation_id=eq."+cid},function(p){
     var m=p.new;
-    for(var i=0;i<MSGS.length;i++){if(MSGS[i].id===m.id)return;}
-    MSGS.push(m);renderMsgs();scrollD();
+    if(!m)return;
+    var found=false;
+    for(var i=0;i<MSGS.length;i++){if(MSGS[i].id===m.id){found=true;break;}}
+    if(!found){MSGS.push(m);renderMsgs();scrollD();}
   }).subscribe();
+  // Poll every 3 seconds as fallback
+  if(window._pollTimer)clearInterval(window._pollTimer);
+  window._pollTimer=setInterval(function(){
+    if(!CONV||CONV.id!==cid){clearInterval(window._pollTimer);return;}
+    SB.from("messages").select("*").eq("conversation_id",cid).order("created_at",{ascending:true}).then(function(r){
+      if(r.data&&r.data.length!==MSGS.length){MSGS=r.data;renderMsgs();scrollD();}
+    });
+  },3000);
 }
 
 // ── SEND ──
@@ -372,12 +383,12 @@ function sendMsg(){
   }else{insertMsg(data);}
 }
 function insertMsg(data){
-  SB.from("messages").insert([data]).select().single().then(function(r){
-    if(r.data){
-      // Add to local array immediately
-      var found=false;
-      for(var i=0;i<MSGS.length;i++){if(MSGS[i].id===r.data.id){found=true;break;}}
-      if(!found){MSGS.push(r.data);renderMsgs();scrollD();}
+  SB.from("messages").insert([data]).then(function(r){
+    // Reload messages immediately after insert
+    if(CONV){
+      SB.from("messages").select("*").eq("conversation_id",CONV.id).order("created_at",{ascending:true}).then(function(r2){
+        MSGS=r2.data||[];renderMsgs();scrollD();
+      });
     }
     SB.from("conversations").update({last_message:data.content||"📎 ملف",last_message_at:new Date().toISOString()}).eq("id",CONV.id).then(function(){});
   });
