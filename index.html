@@ -1107,145 +1107,218 @@ function rejectGame(msgId){
   });
 }
 
-// ── XO GAME ──
-var xoBoard=[],xoMySymbol="",xoOpSymbol="",xoMyTurn=true,xoGameOver=false;
+// ── XO GAME (REALTIME 2-PLAYER) ──
+var xoSession=null,xoSub=null,xoMySymbol="",xoGameOver=false;
+
 function openXO(challengerId){
-  // challengerId = the one who SENT the challenge
-  // If I am the challenger, I get X and go first
-  // If I am the accepter, I get O and go second
-  xoBoard=["","","","","","","","",""];
-  xoGameOver=false;
-  var iAmChallenger=(CU.id===challengerId);
-  xoMySymbol=iAmChallenger?"X":"O";
-  xoOpSymbol=iAmChallenger?"O":"X";
-  xoMyTurn=iAmChallenger; // X goes first
+  // Determine my symbol
+  xoMySymbol=CU.id===challengerId?"X":"O";
   var myDisp=xoMySymbol==="X"?"❌":"⭕";
-  var opDisp=xoOpSymbol==="X"?"❌":"⭕";
+  var opDisp=xoMySymbol==="X"?"⭕":"❌";
   document.getElementById("xo-my-sym").textContent=myDisp;
   document.getElementById("xo-op-sym").textContent=opDisp;
-  document.getElementById("xo-status").textContent=xoMyTurn?"دورك أنت "+myDisp:"دور المنافس... ⏳";
-  renderXO();
+  document.getElementById("xo-status").textContent=xoMySymbol==="X"?"دورك أنت "+myDisp:"دور المنافس ⏳";
+  xoGameOver=false;
+
+  // Find or create game session
+  if(!CONV)return;
+  var p1=challengerId,p2=CU.id===challengerId?null:CU.id;
+
+  SB.from("game_sessions")
+    .select("*")
+    .eq("conversation_id",CONV.id)
+    .eq("game_type","xo")
+    .in("status",["waiting","playing"])
+    .order("created_at",{ascending:false})
+    .limit(1)
+    .then(function(r){
+      if(r.data&&r.data.length>0){
+        xoSession=r.data[0];
+        // Join existing session
+        if(xoSession.status==="waiting"&&xoSession.player1_id!==CU.id){
+          SB.from("game_sessions").update({player2_id:CU.id,status:"playing"}).eq("id",xoSession.id).then(function(){
+            loadXOSession(xoSession.id);
+          });
+        }else{
+          loadXOSession(xoSession.id);
+        }
+      }else{
+        // Create new session
+        SB.from("game_sessions").insert([{
+          conversation_id:CONV.id,
+          game_type:"xo",
+          player1_id:CU.id,
+          player2_id:CU.id,
+          board:["","","","","","","","",""],
+          current_turn:CU.id,
+          status:"waiting"
+        }]).select().single().then(function(r2){
+          if(r2.data){xoSession=r2.data;loadXOSession(r2.data.id);}
+        });
+      }
+    });
   document.getElementById("xo-modal").classList.add("open");
 }
+
+function loadXOSession(sessionId){
+  SB.from("game_sessions").select("*").eq("id",sessionId).single().then(function(r){
+    if(r.data){xoSession=r.data;renderXO();}
+  });
+  // Subscribe to changes
+  if(xoSub)SB.removeChannel(xoSub);
+  xoSub=SB.channel("xo-"+sessionId)
+    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"game_sessions",filter:"id=eq."+sessionId},function(p){
+      xoSession=p.new;renderXO();
+      if(p.new.status==="finished"){
+        xoGameOver=true;
+        var st=document.getElementById("xo-status");
+        if(p.new.winner===CU.id)st.textContent="🏆 أنت الفائز!";
+        else if(p.new.winner==="draw")st.textContent="🤝 تعادل!";
+        else st.textContent="😔 خسرت!";
+      }
+    }).subscribe();
+}
+
 function renderXO(){
-  var board=document.getElementById("xo-board");
-  board.innerHTML="";
+  if(!xoSession)return;
+  var board=xoSession.board||["","","","","","","","",""];
+  var isMyTurn=xoSession.current_turn===CU.id;
+  var st=document.getElementById("xo-status");
+  if(!xoGameOver){
+    if(xoSession.status==="waiting")st.textContent="⏳ في انتظار المنافس...";
+    else if(isMyTurn)st.textContent="دورك أنت "+(xoMySymbol==="X"?"❌":"⭕");
+    else st.textContent="دور المنافس ⏳";
+  }
+  var boardEl=document.getElementById("xo-board");
+  boardEl.innerHTML="";
   for(var i=0;i<9;i++){
     var cell=document.createElement("button");
-    cell.className="xo-cell"+(xoBoard[i]?" taken":"");
-    cell.textContent=xoBoard[i]==="X"?"❌":xoBoard[i]==="O"?"⭕":"";
-    if(!xoBoard[i]&&!xoGameOver&&xoMyTurn){
+    cell.className="xo-cell"+(board[i]?" taken":"");
+    cell.textContent=board[i]==="X"?"❌":board[i]==="O"?"⭕":"";
+    if(!board[i]&&!xoGameOver&&isMyTurn&&xoSession.status==="playing"){
       (function(idx){cell.addEventListener("click",function(){playXO(idx);});})(i);
     }
-    board.appendChild(cell);
+    boardEl.appendChild(cell);
   }
-  var status=document.getElementById("xo-status");
-  if(xoGameOver){}
-  else if(xoMyTurn)status.textContent="دورك أنت "+(xoMySymbol==="X"?"❌":"⭕");
-  else status.textContent="دور المنافس... ⏳";
+  // Highlight win
+  if(xoSession.winner&&xoSession.winner!=="draw"){
+    var lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    var cells=boardEl.querySelectorAll(".xo-cell");
+    var winSym=xoSession.player1_id===xoSession.winner?"X":"O";
+    lines.forEach(function(l){
+      if(board[l[0]]===winSym&&board[l[1]]===winSym&&board[l[2]]===winSym){
+        cells[l[0]].classList.add("win");cells[l[1]].classList.add("win");cells[l[2]].classList.add("win");
+      }
+    });
+  }
 }
+
 function playXO(idx){
-  if(xoBoard[idx]||xoGameOver||!xoMyTurn)return;
-  xoBoard[idx]=xoMySymbol;
-  xoMyTurn=false;
-  renderXO();
-  var winner=checkXO();
-  var status=document.getElementById("xo-status");
-  if(winner){
-    xoGameOver=true;
-    status.textContent=winner===xoMySymbol?"🏆 أنت الفائز!":"😔 خسرت!";
-    highlightWin(winner);
-    if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 نتيجة XO: "+(winner===xoMySymbol?"فزت! 🏆":"خسرت 😔"),msg_type:"text"});
-    return;
-  }
-  if(xoBoard.every(function(c){return c;})){xoGameOver=true;status.textContent="🤝 تعادل!";if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 تعادل في XO! 🤝",msg_type:"text"});return;}
-  // Simulate opponent move after 1s
-  setTimeout(function(){
-    var empty=[];for(var i=0;i<9;i++){if(!xoBoard[i])empty.push(i);}
-    if(empty.length===0)return;
-    var pick=empty[Math.floor(Math.random()*empty.length)];
-    xoBoard[pick]=xoOpSymbol;
-    xoMyTurn=true;
-    renderXO();
-    var w2=checkXO();
-    if(w2){xoGameOver=true;status.textContent=w2===xoMySymbol?"🏆 أنت الفائز!":"😔 خسرت!";highlightWin(w2);
-      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 نتيجة XO: "+(w2===xoMySymbol?"فزت! 🏆":"خسرت 😔"),msg_type:"text"});
-    } else if(xoBoard.every(function(c){return c;})){xoGameOver=true;status.textContent="🤝 تعادل!";}
-  },800);
+  if(!xoSession||xoSession.status!=="playing")return;
+  if(xoSession.current_turn!==CU.id)return;
+  var board=xoSession.board.slice();
+  if(board[idx])return;
+  board[idx]=xoMySymbol;
+  // Check winner
+  var winner=checkXOWin(board);
+  var isDraw=!winner&&board.every(function(c){return c;});
+  var otherPlayer=xoSession.player1_id===CU.id?xoSession.player2_id:xoSession.player1_id;
+  var updates={
+    board:board,
+    current_turn:otherPlayer,
+    updated_at:new Date().toISOString()
+  };
+  if(winner){updates.status="finished";updates.winner=CU.id;xoGameOver=true;}
+  else if(isDraw){updates.status="finished";updates.winner="draw";xoGameOver=true;}
+  SB.from("game_sessions").update(updates).eq("id",xoSession.id).then(function(){
+    if(winner){
+      T("🏆 أنت الفائز!");
+      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🏆 فزت في لعبة XO!"});
+    }else if(isDraw){
+      T("🤝 تعادل!");
+      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🤝 تعادل في XO!"});
+    }
+  });
 }
-function checkXO(){
+function checkXOWin(b){
   var lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
   for(var i=0;i<lines.length;i++){
-    var a=lines[i][0],b=lines[i][1],c=lines[i][2];
-    if(xoBoard[a]&&xoBoard[a]===xoBoard[b]&&xoBoard[a]===xoBoard[c])return xoBoard[a];
+    var a=lines[i][0],bx=lines[i][1],c=lines[i][2];
+    if(b[a]&&b[a]===b[bx]&&b[a]===b[c])return b[a];
   }return null;
 }
-function highlightWin(sym){
-  var lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-  var cells=document.getElementById("xo-board").querySelectorAll(".xo-cell");
-  for(var i=0;i<lines.length;i++){
-    var a=lines[i][0],b=lines[i][1],c=lines[i][2];
-    if(xoBoard[a]===sym&&xoBoard[b]===sym&&xoBoard[c]===sym){
-      cells[a].classList.add("win");cells[b].classList.add("win");cells[c].classList.add("win");
-    }
-  }
+function restartXO(){
+  if(!xoSession)return;
+  SB.from("game_sessions").update({
+    board:["","","","","","","","",""],
+    current_turn:xoSession.player1_id,
+    status:"playing",winner:null,updated_at:new Date().toISOString()
+  }).eq("id",xoSession.id).then(function(){xoGameOver=false;});
 }
-function restartXO(){xoBoard=["","","","","","","","",""];xoGameOver=false;xoMyTurn=xoMySymbol==="X";renderXO();document.getElementById("xo-status").textContent="دورك أنت "+(xoMySymbol==="X"?"❌":"⭕");}
-function closeXO(){document.getElementById("xo-modal").classList.remove("open");}
+function closeXO(){
+  if(xoSub){SB.removeChannel(xoSub);xoSub=null;}
+  document.getElementById("xo-modal").classList.remove("open");
+}
 
-// ── QUIZ GAME ──
+// ── QUIZ GAME (Islamic Questions) ──
 var QUIZZES=[
-  {q:"ما هي عاصمة العراق؟",opts:["بغداد","البصرة","الموصل","أربيل"],ans:0},
-  {q:"كم يبلغ 7 × 8؟",opts:["54","56","58","64"],ans:1},
-  {q:"ما هو أكبر محيط في العالم؟",opts:["الأطلسي","الهندي","الهادي","المتجمد"],ans:2},
-  {q:"من اخترع الهاتف؟",opts:["إديسون","غراهام بيل","ماركوني","تسلا"],ans:1},
-  {q:"كم عدد أيام السنة الكبيسة؟",opts:["365","366","364","367"],ans:1},
-  {q:"ما هي أصغر قارة؟",opts:["أفريقيا","أستراليا","أوروبا","أنتاركتيكا"],ans:1},
-  {q:"من كتب قصيدة المتنبي الشهيرة؟",opts:["المتنبي","أبو تمام","البحتري","امرؤ القيس"],ans:0},
-  {q:"كم عدد لاعبي فريق كرة القدم؟",opts:["9","10","11","12"],ans:2},
+  {q:"ما عدد سور القرآن الكريم؟",opts:["112","113","114","115"],ans:2},
+  {q:"ما اسم أطول سورة في القرآن؟",opts:["آل عمران","النساء","البقرة","المائدة"],ans:2},
+  {q:"ما اسم أقصر سورة في القرآن؟",opts:["الإخلاص","الكوثر","الفلق","الناس"],ans:1},
+  {q:"كم عدد أجزاء القرآن الكريم؟",opts:["28","29","30","31"],ans:2},
+  {q:"في أي شهر نزل القرآن؟",opts:["رجب","شعبان","رمضان","محرم"],ans:2},
+  {q:"ما اسم أول سورة نزلت؟",opts:["الفاتحة","المدثر","العلق","المزمل"],ans:2},
+  {q:"كم عدد آيات سورة الفاتحة؟",opts:["5","6","7","8"],ans:2},
+  {q:"ما معنى كلمة القرآن؟",opts:["الكتاب","المقروء","الحكمة","النور"],ans:1},
+  {q:"من هو النبي الأول؟",opts:["إدريس","نوح","آدم","إبراهيم"],ans:2},
+  {q:"كم عدد أركان الإسلام؟",opts:["4","5","6","7"],ans:1},
+  {q:"ما عدد أنبياء الإسلام المذكورين في القرآن؟",opts:["23","24","25","26"],ans:2},
+  {q:"ما اسم جبل نزل عليه الوحي؟",opts:["ثور","عرفات","النور","أحد"],ans:2},
+  {q:"ما اسم والد النبي محمد ﷺ؟",opts:["عبدالله","عبدالمطلب","أبو طالب","حمزة"],ans:0},
+  {q:"في أي مدينة وُلد النبي محمد ﷺ؟",opts:["المدينة","مكة","الطائف","جدة"],ans:1},
+  {q:"كم سنة استغرق نزول القرآن؟",opts:["20","23","25","30"],ans:1},
 ];
-var quizIdx=0,quizScore=0,quizAnswered=false;
+var quizIdx=0,quizScore=0,quizAnswered=false,quizQuestions=[];
 function openQuiz(){
+  quizQuestions=QUIZZES.slice().sort(function(){return Math.random()-.5;}).slice(0,8);
   quizIdx=0;quizScore=0;quizAnswered=false;
-  // Shuffle
-  QUIZZES.sort(function(){return Math.random()-.5;});
   renderQuiz();
   document.getElementById("quiz-modal").classList.add("open");
 }
 function renderQuiz(){
-  var q=QUIZZES[quizIdx%QUIZZES.length];
+  var q=quizQuestions[quizIdx];
   quizAnswered=false;
-  document.getElementById("quiz-score").textContent="النتيجة: "+quizScore+"/"+quizIdx;
+  document.getElementById("quiz-score").textContent="السؤال "+(quizIdx+1)+"/"+quizQuestions.length+" · النتيجة: "+quizScore;
   document.getElementById("quiz-q").textContent=q.q;
   document.getElementById("quiz-next").style.display="none";
-  var optsEl=document.getElementById("quiz-opts");optsEl.innerHTML="";
+  var optsEl=document.getElementById("quiz-opts");
+  optsEl.innerHTML="";
   q.opts.forEach(function(opt,i){
-    var btn=document.createElement("button");btn.className="quiz-opt";btn.textContent=opt;
+    var btn=document.createElement("button");
+    btn.className="quiz-opt";btn.textContent=opt;
     (function(idx){btn.addEventListener("click",function(){answerQuiz(idx);});})(i);
     optsEl.appendChild(btn);
   });
 }
 function answerQuiz(picked){
-  if(quizAnswered)return;quizAnswered=true;
-  var q=QUIZZES[quizIdx%QUIZZES.length];
+  if(quizAnswered)return;
+  quizAnswered=true;
+  var q=quizQuestions[quizIdx];
   var opts=document.getElementById("quiz-opts").querySelectorAll(".quiz-opt");
   opts[picked].classList.add(picked===q.ans?"correct":"wrong");
   if(picked!==q.ans)opts[q.ans].classList.add("correct");
-  if(picked===q.ans)quizScore++;
+  if(picked===q.ans){quizScore++;T("✅ إجابة صحيحة!");}
+  else T("❌ إجابة خاطئة!");
   quizIdx++;
-  document.getElementById("quiz-score").textContent="النتيجة: "+quizScore+"/"+quizIdx;
-  document.getElementById("quiz-next").style.display="block";
-}
-function nextQuizQ(){
-  if(quizIdx>=8){
-    document.getElementById("quiz-q").textContent="انتهت الأسئلة! نتيجتك: "+quizScore+"/8";
+  document.getElementById("quiz-score").textContent="السؤال "+quizIdx+"/"+quizQuestions.length+" · النتيجة: "+quizScore;
+  document.getElementById("quiz-next").style.display=quizIdx<quizQuestions.length?"block":"none";
+  if(quizIdx>=quizQuestions.length){
+    document.getElementById("quiz-q").textContent="🎉 انتهت الأسئلة! نتيجتك: "+quizScore+"/"+quizQuestions.length;
     document.getElementById("quiz-opts").innerHTML="";
-    document.getElementById("quiz-next").style.display="none";
-    if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🏆 انتهيت من تحدي الأسئلة! نتيجتي: "+quizScore+"/8",msg_type:"text"});
-    return;
+    if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🧠 نتيجتي في تحدي الأسئلة: "+quizScore+"/"+quizQuestions.length+" 🏆"});
   }
-  renderQuiz();
 }
+function nextQuizQ(){renderQuiz();}
 function closeQuiz(){document.getElementById("quiz-modal").classList.remove("open");}
 
 // ── INIT ──
