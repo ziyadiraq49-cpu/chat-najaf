@@ -1295,12 +1295,13 @@ var gameSub=null,activeGame=null;
 function createGameSession(gameType,extraData,cb){
   if(!CONV)return;
   var otherPlayer=CONV.user1_id===CU.id?CONV.user2_id:CONV.user1_id;
+  // Try with all columns first
   SB.from("game_sessions").insert([{
     conversation_id:CONV.id,
     game_type:gameType,
     player1_id:CU.id,
     player2_id:otherPlayer,
-    board:[],
+    board:["","","","","","","","",""],
     current_turn:CU.id,
     status:"waiting",
     scores:{},
@@ -1308,6 +1309,12 @@ function createGameSession(gameType,extraData,cb){
     answers:{},
     extra:extraData||{}
   }]).select().single().then(function(r){
+    if(r.error){
+      // Fallback: try without new columns
+      T("خطأ: "+r.error.message+". شغّل update_game_sessions.sql في Supabase");
+      if(cb)cb(null);
+      return;
+    }
     if(r.data&&cb)cb(r.data);
   });
 }
@@ -1329,18 +1336,29 @@ function subGame(sessionId,onUpdate){
 }
 
 function findOrCreateGame(gameType,extraData,cb){
-  if(!CONV)return;
+  if(!CONV){T("افتح محادثة أولاً");return;}
   SB.from("game_sessions")
     .select("*").eq("conversation_id",CONV.id).eq("game_type",gameType)
     .in("status",["waiting","playing"]).order("created_at",{ascending:false}).limit(1)
     .then(function(r){
+      if(r.error){
+        // Table might not have new columns - try creating anyway
+        createGameSession(gameType,extraData,function(s){
+          if(s)if(cb)cb(s,true);
+          else T("خطأ في إنشاء الجلسة: "+JSON.stringify(r.error));
+        });
+        return;
+      }
       if(r.data&&r.data.length>0){
         var s=r.data[0];
         if(s.status==="waiting"&&s.player1_id!==CU.id){
           joinGameSession(s.id,function(updated){if(cb)cb(updated,false);});
         }else{if(cb)cb(s,s.player1_id===CU.id);}
       }else{
-        createGameSession(gameType,extraData,function(s){if(cb)cb(s,true);});
+        createGameSession(gameType,extraData,function(s){
+          if(s)if(cb)cb(s,true);
+          else T("خطأ في إنشاء الجلسة");
+        });
       }
     });
 }
@@ -1351,7 +1369,9 @@ function openXO(challengerId){
   xoMySymbol=CU.id===challengerId?"X":"O";
   document.getElementById("xo-my-sym").textContent=xoMySymbol==="X"?"❌":"⭕";
   document.getElementById("xo-op-sym").textContent=xoMySymbol==="X"?"⭕":"❌";
+  document.getElementById("xo-modal").classList.add("open");
   findOrCreateGame("xo",{},function(s,isHost){
+    if(!s){T("تعذر إنشاء جلسة اللعبة");return;}
     xoSession=s;
     renderXO();
     subGame(s.id,function(updated){
