@@ -184,6 +184,36 @@ body{display:flex;flex-direction:column}
 .game-reject{background:var(--sur2);border:1px solid var(--bdr);color:var(--mute);font-family:"Cairo",sans-serif;font-size:12px;cursor:pointer;padding:8px 14px;border-radius:8px}
 .game-play-btn{background:linear-gradient(135deg,#7c3aed,#4c1d95);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:700;font-size:12px;cursor:pointer;padding:8px 16px;border-radius:8px;width:100%;margin-top:6px}
 
+/* BASKETBALL GAME */
+#bball-modal{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:250;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#bball-modal.open{display:flex}
+.bball-box{background:var(--sur);border:1px solid rgba(234,88,12,.4);border-radius:20px;padding:20px;width:92%;max-width:380px;text-align:center}
+.bball-title{font-size:16px;font-weight:900;color:#f97316;margin-bottom:6px}
+.bball-score{font-size:28px;font-weight:900;color:#f97316;margin-bottom:6px}
+.bball-canvas{width:100%;height:260px;background:linear-gradient(180deg,#1e3a5f 0%,#0f1e35 100%);border-radius:14px;position:relative;overflow:hidden;cursor:pointer;border:2px solid rgba(234,88,12,.3)}
+.bball-hoop{position:absolute;top:50px;left:50%;transform:translateX(-50%);width:60px;height:20px}
+.bball-hoop-bar{width:60px;height:4px;background:#f97316;border-radius:2px;position:relative}
+.bball-hoop-bar::before,.bball-hoop-bar::after{content:"";position:absolute;bottom:0;width:3px;height:20px;background:#c2410c}
+.bball-hoop-bar::before{left:4px}
+.bball-hoop-bar::after{right:4px}
+.bball-net{width:50px;height:24px;border:2px solid rgba(255,255,255,.3);border-top:none;border-radius:0 0 8px 8px;position:absolute;top:4px;left:50%;transform:translateX(-50%)}
+.bball-ball{position:absolute;width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fb923c,#c2410c);font-size:20px;display:flex;align-items:center;justify-content:center;transition:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.bball-power{width:100%;height:8px;background:var(--sur2);border-radius:4px;margin:10px 0;overflow:hidden}
+.bball-power-fill{height:100%;background:linear-gradient(90deg,#22c55e,#f97316,#ef4444);border-radius:4px;transition:width .1s}
+.bball-hint{font-size:12px;color:var(--mute);margin-bottom:12px}
+
+/* DART GAME */
+#dart-modal{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:250;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#dart-modal.open{display:flex}
+.dart-box{background:var(--sur);border:1px solid rgba(34,197,94,.4);border-radius:20px;padding:20px;width:92%;max-width:380px;text-align:center}
+.dart-title{font-size:16px;font-weight:900;color:#22c55e;margin-bottom:6px}
+.dart-score{font-size:28px;font-weight:900;color:#22c55e;margin-bottom:6px}
+.dart-board-wrap{position:relative;width:240px;height:240px;margin:0 auto 10px;cursor:crosshair}
+.dart-board{width:100%;height:100%;border-radius:50%;position:relative;overflow:hidden}
+.dart-ring{position:absolute;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%)}
+.dart-aim{position:absolute;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.9);border:2px solid #1a1a1a;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 8px rgba(255,255,255,.6);display:none;transition:left .05s,top .05s}
+.dart-throw-indicator{position:absolute;border-radius:50%;background:rgba(255,255,0,.8);width:12px;height:12px;transform:translate(-50%,-50%);pointer-events:none}
+
 /* XO GAME MODAL */
 #xo-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:250;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
 #xo-modal.open{display:flex}
@@ -303,7 +333,9 @@ body{display:flex;flex-direction:column}
           <select class="pfinp" id="game-type">
             <option value="quiz">❓ أسئلة وأجوبة</option>
             <option value="xo">⭕ لعبة XO</option>
-            <option value="dare">🎯 جرأة أو حقيقة</option>
+            <option value="bball">🏀 كرة السلة</option>
+            <option value="dart">🎯 رمي السهم</option>
+            <option value="dare">🔥 جرأة أو حقيقة</option>
             <option value="custom">✏️ تحدي مخصص</option>
           </select>
         </div>
@@ -389,6 +421,52 @@ body{display:flex;flex-direction:column}
     <button class="fbtn" onclick="doAdmLogin()" style="background:#ff6b35">دخول</button>
     <button onclick="closeAdmLogin()" style="width:100%;padding:10px;margin-top:8px;background:none;border:none;color:var(--mute);font-family:Cairo,sans-serif;font-size:13px;cursor:pointer">إلغاء</button>
     <div style="text-align:center;font-size:11px;color:var(--dim);margin-top:12px">كلمة المرور الافتراضية: <b style="color:#ff6b35">admin1234</b></div>
+  </div>
+</div>
+
+<!-- BASKETBALL GAME -->
+<div id="bball-modal">
+  <div class="bball-box">
+    <div class="bball-title">🏀 كرة السلة</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div><div style="font-size:11px;color:var(--mute)">أنت</div><div class="bball-score" id="bb-my-score">0</div></div>
+      <div style="font-size:20px">VS</div>
+      <div><div style="font-size:11px;color:var(--mute)">جولات</div><div class="bball-score" style="color:var(--mute)" id="bb-round">1/5</div></div>
+    </div>
+    <div class="bball-hint" id="bb-hint">اضغط للتصويب! 🏀</div>
+    <div class="bball-canvas" id="bb-canvas" onclick="bbShoot(event)">
+      <div class="bball-hoop" id="bb-hoop">
+        <div class="bball-hoop-bar"></div>
+        <div class="bball-net"></div>
+      </div>
+      <div class="bball-ball" id="bb-ball" style="bottom:20px;left:50%;transform:translateX(-50%)">🏀</div>
+    </div>
+    <div class="bball-power"><div class="bball-power-fill" id="bb-power" style="width:0%"></div></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="restartBball()" class="xo-restart">🔄 جديد</button>
+      <button onclick="closeBball()" class="xo-close">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- DART GAME -->
+<div id="dart-modal">
+  <div class="dart-box">
+    <div class="dart-title">🎯 رمي السهم</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div><div style="font-size:11px;color:var(--mute)">النقاط</div><div class="dart-score" id="dart-score">0</div></div>
+      <div><div style="font-size:11px;color:var(--mute)">رميات</div><div class="dart-score" style="color:var(--mute)" id="dart-throws">0/5</div></div>
+    </div>
+    <div id="dart-last" style="font-size:13px;color:var(--mute);margin-bottom:8px;min-height:20px"></div>
+    <div class="dart-board-wrap" id="dart-board-wrap" onclick="throwDart(event)">
+      <div class="dart-board" id="dart-board"></div>
+      <div class="dart-aim" id="dart-aim"></div>
+    </div>
+    <div style="font-size:12px;color:var(--mute);margin-bottom:12px">انقر على الهدف للرمي!</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="restartDart()" class="xo-restart">🔄 جديد</button>
+      <button onclick="closeDart()" class="xo-close">إغلاق</button>
+    </div>
   </div>
 </div>
 
@@ -499,6 +577,7 @@ function launch(){
   showPage("pg-list");
   SB.from("profiles").select("id,full_name,email").then(function(r){PROFS=r.data||[];});
   loadConvs();
+  initNotifSound();
 }
 
 // ── PROFILES ──
@@ -699,7 +778,11 @@ function subChat(cid){
     if(!m)return;
     var found=false;
     for(var i=0;i<MSGS.length;i++){if(MSGS[i].id===m.id){found=true;break;}}
-    if(!found){MSGS.push(m);renderMsgs();scrollD();}
+    if(!found){
+      MSGS.push(m);renderMsgs();scrollD();
+      // Play sound if message is from someone else
+      if(m.sender_id!==CU.id)playNotifSound();
+    }
   }).subscribe();
   // Poll every 3 seconds as fallback
   if(window._pollTimer)clearInterval(window._pollTimer);
@@ -1184,7 +1267,9 @@ function acceptGame(msgId){
       setTimeout(function(){
         if(gameType==="xo")openXO(challengerId);
         else if(gameType==="quiz")openQuiz();
-        else if(gameType==="dare"){insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎯 قبلت تحدي الجرأة! "+ex.desc,msg_type:"text"});}
+        else if(gameType==="bball")openBball();
+        else if(gameType==="dart")openDart();
+        else if(gameType==="dare"){insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🔥 قبلت تحدي الجرأة! "+ex.desc,msg_type:"text"});}
         else{T("✅ تم قبول التحدي! "+ex.desc);}
       },500);
     });
@@ -1416,6 +1501,202 @@ function answerQuiz(picked){
 }
 function nextQuizQ(){renderQuiz();}
 function closeQuiz(){document.getElementById("quiz-modal").classList.remove("open");}
+
+// ── BASKETBALL GAME ──
+var bbScore=0,bbRound=0,bbMaxRounds=5,bbAnimating=false,bbHoopLeft=50;
+function openBball(){
+  bbScore=0;bbRound=0;bbAnimating=false;
+  updateBballUI();
+  moveBballHoop();
+  document.getElementById("bball-modal").classList.add("open");
+}
+function updateBballUI(){
+  document.getElementById("bb-my-score").textContent=bbScore;
+  document.getElementById("bb-round").textContent=(bbRound+1)+"/"+bbMaxRounds;
+}
+function moveBballHoop(){
+  bbHoopLeft=20+Math.random()*60;
+  var hoop=document.getElementById("bb-hoop");
+  if(hoop)hoop.style.left=bbHoopLeft+"%";
+}
+function bbShoot(e){
+  if(bbAnimating||bbRound>=bbMaxRounds)return;
+  bbAnimating=true;
+  var canvas=document.getElementById("bb-canvas");
+  var ball=document.getElementById("bb-ball");
+  var rect=canvas.getBoundingClientRect();
+  var clickX=((e.clientX-rect.left)/rect.width)*100;
+  // Animate ball upward
+  var startBottom=20;
+  var targetBottom=70;
+  var startLeft=50;
+  var frames=0;
+  var maxFrames=20;
+  var pwr=document.getElementById("bb-power");
+  // Power animation
+  var pwrVal=0,pwrDir=1;
+  var pwrTimer=setInterval(function(){
+    pwrVal+=pwrDir*8;
+    if(pwrVal>=100)pwrDir=-1;
+    if(pwrVal<=0)pwrDir=1;
+    if(pwr)pwr.style.width=pwrVal+"%";
+  },50);
+  // Shoot after 500ms
+  setTimeout(function(){
+    clearInterval(pwrTimer);
+    var dist=Math.abs(clickX-bbHoopLeft);
+    var accuracy=Math.max(0,1-(dist/30));
+    var isGoal=Math.random()<accuracy;
+    // Animate ball
+    var animTimer=setInterval(function(){
+      frames++;
+      var progress=frames/maxFrames;
+      var curBottom=startBottom+(targetBottom-startBottom)*progress;
+      var curLeft=startLeft+(clickX-startLeft)*progress;
+      if(ball){ball.style.bottom=curBottom+"%";ball.style.left=curLeft+"%";}
+      if(frames>=maxFrames){
+        clearInterval(animTimer);
+        if(isGoal){
+          bbScore+=3;
+          document.getElementById("bb-hint").textContent="🎉 أحرزت! +3 نقاط";
+          if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🏀 أحرزت سلة! نقاطي: "+bbScore});
+        }else{
+          document.getElementById("bb-hint").textContent="😅 أخطأت! حاول مجدداً";
+        }
+        bbRound++;updateBballUI();
+        // Reset ball
+        setTimeout(function(){
+          if(ball){ball.style.bottom="20px";ball.style.left="50%";}
+          bbAnimating=false;
+          if(bbRound>=bbMaxRounds){
+            document.getElementById("bb-hint").textContent="انتهت اللعبة! نقاطك: "+bbScore;
+            if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🏀 انتهى تحدي كرة السلة! نقاطي: "+bbScore+"/"+bbMaxRounds*3});
+          }else{
+            moveBballHoop();
+          }
+        },600);
+      }
+    },25);
+  },500);
+}
+function restartBball(){bbScore=0;bbRound=0;bbAnimating=false;updateBballUI();moveBballHoop();document.getElementById("bb-hint").textContent="اضغط للتصويب! 🏀";}
+function closeBball(){document.getElementById("bball-modal").classList.remove("open");}
+
+// ── DART GAME ──
+var dartScore=0,dartThrows=0,dartMaxThrows=5,dartColors=["#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#ffffff"],dartZones=[{r:15,pts:50,color:"#ef4444"},{r:30,pts:25,color:"#22c55e"},{r:55,pts:10,color:"#1d4ed8"},{r:80,pts:5,color:"#ef4444"},{r:105,pts:2,color:"#1d4ed8"},{r:120,pts:1,color:"#000"}];
+function openDart(){
+  dartScore=0;dartThrows=0;
+  renderDartBoard();
+  document.getElementById("dart-modal").classList.add("open");
+}
+function renderDartBoard(){
+  var board=document.getElementById("dart-board");
+  if(!board)return;
+  board.style.cssText="width:100%;height:100%;border-radius:50%;position:relative;background:#000";
+  // Draw rings from outside in
+  var zones=[
+    {r:100,color:"#1a1a1a"},{r:95,color:"#ef4444"},{r:90,color:"#1a1a1a"},
+    {r:75,color:"#22c55e"},{r:55,color:"#ef4444"},{r:40,color:"#22c55e"},
+    {r:25,color:"#22c55e"},{r:12,color:"#ef4444"},{r:5,color:"#ef4444"}
+  ];
+  board.innerHTML="";
+  zones.forEach(function(z){
+    var ring=document.createElement("div");
+    ring.style.cssText="position:absolute;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);background:"+z.color+";width:"+z.r*2+"%;height:"+z.r*2+"%;";
+    board.appendChild(ring);
+  });
+  // Labels
+  var labels=[{r:95,txt:"1",c:"white"},{r:75,txt:"5",c:"white"},{r:55,txt:"10",c:"white"},{r:38,txt:"25",c:"white"},{r:20,txt:"50",c:"white"},{r:6,txt:"🎯",c:"white"}];
+  labels.forEach(function(l){
+    var lbl=document.createElement("div");
+    lbl.style.cssText="position:absolute;top:50%;left:50%;transform:translate(-50%,-"+l.r+"%) translateY(-50%);color:"+l.c+";font-size:11px;font-weight:900;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.8);";
+    lbl.textContent=l.txt;board.appendChild(lbl);
+  });
+  updateDartUI();
+}
+function updateDartUI(){
+  document.getElementById("dart-score").textContent=dartScore;
+  document.getElementById("dart-throws").textContent=dartThrows+"/"+dartMaxThrows;
+}
+function throwDart(e){
+  if(dartThrows>=dartMaxThrows)return;
+  var wrap=document.getElementById("dart-board-wrap");
+  var rect=wrap.getBoundingClientRect();
+  var cx=rect.left+rect.width/2;
+  var cy=rect.top+rect.height/2;
+  var dx=e.clientX-cx;
+  var dy=e.clientY-cy;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  var maxR=rect.width/2;
+  var pct=(dist/maxR)*100;
+  // Show aim indicator
+  var aim=document.getElementById("dart-aim");
+  aim.style.display="block";
+  aim.style.left=((e.clientX-rect.left)/rect.width*100)+"%";
+  aim.style.top=((e.clientY-rect.top)/rect.height*100)+"%";
+  // Calculate score based on distance from center
+  var pts=0;
+  if(pct<=5)pts=50;
+  else if(pct<=12)pts=50;
+  else if(pct<=25)pts=25;
+  else if(pct<=40)pts=25;
+  else if(pct<=55)pts=10;
+  else if(pct<=65)pts=5;
+  else if(pct<=80)pts=2;
+  else if(pct<=95)pts=1;
+  // Add random inaccuracy
+  var luck=Math.random();
+  if(luck>0.7)pts=Math.max(0,pts-1);
+  else if(luck>0.9)pts+=5;
+  dartScore+=pts;
+  dartThrows++;
+  var lastEl=document.getElementById("dart-last");
+  if(pts>=50)lastEl.textContent="🎯 مركز! +"+pts+" نقطة";
+  else if(pts>=25)lastEl.textContent="🔥 ممتاز! +"+pts+" نقاط";
+  else if(pts>=10)lastEl.textContent="👍 جيد! +"+pts+" نقاط";
+  else if(pts>0)lastEl.textContent="😅 قريب! +"+pts+" نقاط";
+  else lastEl.textContent="❌ خطأ!";
+  updateDartUI();
+  // Show dart throw indicator
+  var indicator=document.createElement("div");
+  indicator.className="dart-throw-indicator";
+  indicator.style.left=((e.clientX-rect.left)/rect.width*100)+"%";
+  indicator.style.top=((e.clientY-rect.top)/rect.height*100)+"%";
+  wrap.appendChild(indicator);
+  setTimeout(function(){if(indicator.parentNode)indicator.parentNode.removeChild(indicator);},1000);
+  if(dartThrows>=dartMaxThrows){
+    lastEl.textContent="🏆 انتهت اللعبة! نقاطك: "+dartScore;
+    if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎯 انتهى تحدي رمي السهم! نقاطي: "+dartScore+" من "+dartMaxThrows+" رميات"});
+    setTimeout(function(){aim.style.display="none";},1000);
+  }
+}
+function restartDart(){dartScore=0;dartThrows=0;var aim=document.getElementById("dart-aim");if(aim)aim.style.display="none";document.getElementById("dart-last").textContent="";renderDartBoard();}
+function closeDart(){document.getElementById("dart-modal").classList.remove("open");}
+
+// ── NOTIFICATION SOUND ──
+var notifAudio=null;
+function initNotifSound(){
+  // Create notification sound using Web Audio API
+  var ctx=null;
+  try{ctx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
+  window._audioCtx=ctx;
+}
+function playNotifSound(){
+  try{
+    var ctx=window._audioCtx;
+    if(!ctx){ctx=new(window.AudioContext||window.webkitAudioContext)();window._audioCtx=ctx;}
+    if(ctx.state==="suspended")ctx.resume();
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880,ctx.currentTime);
+    osc.frequency.setValueAtTime(1100,ctx.currentTime+0.1);
+    gain.gain.setValueAtTime(0.3,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+0.3);
+  }catch(e){}
+}
 
 // ── REPLY ──
 var replyToMsg=null;
