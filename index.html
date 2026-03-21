@@ -150,6 +150,36 @@ body{display:flex;flex-direction:column}
 .game-btns{display:flex;gap:8px}
 .game-accept{background:linear-gradient(135deg,#7c3aed,#4c1d95);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:700;font-size:12px;cursor:pointer;padding:8px 14px;border-radius:8px;flex:1}
 .game-reject{background:var(--sur2);border:1px solid var(--bdr);color:var(--mute);font-family:"Cairo",sans-serif;font-size:12px;cursor:pointer;padding:8px 14px;border-radius:8px}
+.game-play-btn{background:linear-gradient(135deg,#7c3aed,#4c1d95);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:700;font-size:12px;cursor:pointer;padding:8px 16px;border-radius:8px;width:100%;margin-top:6px}
+
+/* XO GAME MODAL */
+#xo-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:250;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#xo-modal.open{display:flex}
+.xo-box{background:var(--sur);border:1px solid rgba(124,58,237,.4);border-radius:20px;padding:24px 20px;width:92%;max-width:380px;text-align:center}
+.xo-title{font-size:16px;font-weight:900;color:#a78bfa;margin-bottom:6px}
+.xo-status{font-size:13px;color:var(--mute);margin-bottom:18px;min-height:20px}
+.xo-board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.xo-cell{width:100%;aspect-ratio:1;background:var(--sur2);border:2px solid var(--bdr);border-radius:12px;font-size:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-family:"Cairo",sans-serif}
+.xo-cell:hover:not(.taken){background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.4)}
+.xo-cell.taken{cursor:default}
+.xo-cell.win{background:rgba(124,58,237,.2);border-color:#7c3aed}
+.xo-btns{display:flex;gap:8px}
+.xo-restart{flex:1;background:var(--sur2);border:1px solid var(--bdr);color:var(--mute);font-family:"Cairo",sans-serif;font-size:13px;cursor:pointer;padding:10px;border-radius:10px}
+.xo-close{flex:1;background:linear-gradient(135deg,#7c3aed,#4c1d95);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:700;font-size:13px;cursor:pointer;padding:10px;border-radius:10px}
+
+/* QUIZ GAME MODAL */
+#quiz-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:250;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#quiz-modal.open{display:flex}
+.quiz-box{background:var(--sur);border:1px solid rgba(234,179,8,.3);border-radius:20px;padding:24px 20px;width:92%;max-width:400px}
+.quiz-title{font-size:15px;font-weight:900;color:#eab308;margin-bottom:16px;text-align:center}
+.quiz-q{font-size:14px;font-weight:700;margin-bottom:14px;line-height:1.6;text-align:center}
+.quiz-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.quiz-opt{background:var(--sur2);border:1.5px solid var(--bdr);color:var(--txt);font-family:"Cairo",sans-serif;font-size:13px;cursor:pointer;padding:11px 14px;border-radius:10px;text-align:right;transition:all .2s}
+.quiz-opt:hover{border-color:#eab308;background:rgba(234,179,8,.08)}
+.quiz-opt.correct{background:rgba(34,197,94,.15);border-color:#22c55e;color:#22c55e}
+.quiz-opt.wrong{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444}
+.quiz-score{text-align:center;font-size:13px;color:var(--mute);margin-bottom:12px}
+.quiz-next{width:100%;background:linear-gradient(135deg,#eab308,#78350f);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:700;font-size:14px;cursor:pointer;padding:12px;border-radius:10px}
 .stat-card{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:16px;text-align:center}
 .stat-val{font-size:28px;font-weight:900;color:#ff6b35;display:block;margin-bottom:4px}
 .stat-lbl{font-size:12px;color:var(--mute)}
@@ -320,6 +350,32 @@ body{display:flex;flex-direction:column}
     <button class="fbtn" onclick="doAdmLogin()" style="background:#ff6b35">دخول</button>
     <button onclick="closeAdmLogin()" style="width:100%;padding:10px;margin-top:8px;background:none;border:none;color:var(--mute);font-family:Cairo,sans-serif;font-size:13px;cursor:pointer">إلغاء</button>
     <div style="text-align:center;font-size:11px;color:var(--dim);margin-top:12px">كلمة المرور الافتراضية: <b style="color:#ff6b35">admin1234</b></div>
+  </div>
+</div>
+
+<!-- XO GAME -->
+<div id="xo-modal">
+  <div class="xo-box">
+    <div class="xo-title">🎮 لعبة إكس أو</div>
+    <div class="xo-status" id="xo-status">دورك أنت ⭕</div>
+    <div class="xo-board" id="xo-board"></div>
+    <div style="font-size:12px;color:var(--mute);margin-bottom:14px">أنت: <span id="xo-my-sym" style="color:#a78bfa;font-weight:900"></span> | المنافس: <span id="xo-op-sym" style="color:#f97316;font-weight:900"></span></div>
+    <div class="xo-btns">
+      <button class="xo-restart" onclick="restartXO()">🔄 جولة جديدة</button>
+      <button class="xo-close" onclick="closeXO()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUIZ GAME -->
+<div id="quiz-modal">
+  <div class="quiz-box">
+    <div class="quiz-title">❓ تحدي الأسئلة</div>
+    <div class="quiz-score" id="quiz-score">النتيجة: 0/0</div>
+    <div class="quiz-q" id="quiz-q"></div>
+    <div class="quiz-opts" id="quiz-opts"></div>
+    <button class="quiz-next" id="quiz-next" onclick="nextQuizQ()" style="display:none">التالي ›</button>
+    <button class="xo-close" onclick="closeQuiz()" style="width:100%;margin-top:8px">إغلاق</button>
   </div>
 </div>
 
@@ -992,22 +1048,26 @@ function sendGameChallenge(){
   closeGameModal();
 }
 function acceptGame(msgId){
-  if(!confirm("قبول التحدي؟"))return;
-  // First get the message to preserve existing extra fields
-  SB.from("messages").select("extra").eq("id",msgId).single().then(function(r){
-    var ex=r.data&&r.data.extra?r.data.extra:{};
-    ex.status="accepted";
+  SB.from("messages").select("extra,sender_id").eq("id",msgId).single().then(function(r){
+    if(r.error){T("خطأ في جلب بيانات التحدي");return;}
+    var ex=r.data.extra||{};
+    var gameType=ex.type||"custom";
+    ex.status="accepted";ex.accepted_by=CU.id;
     SB.from("messages").update({extra:ex}).eq("id",msgId).then(function(ur){
       if(ur.error){T("خطأ: "+ur.error.message);return;}
-      T("✅ قبلت التحدي! ابدأ اللعب 🎮");
-      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"✅ قبلت التحدي! لنبدأ 🎮",msg_type:"text"});
-      // Reload messages to reflect change
+      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"✅ قبلت التحدي! لنبدأ اللعب 🎮",msg_type:"text"});
       if(CONV)loadMsgs(CONV.id);
+      // Open the game
+      setTimeout(function(){
+        if(gameType==="xo")openXO(r.data.sender_id);
+        else if(gameType==="quiz")openQuiz();
+        else if(gameType==="dare"){T("🎯 تحدي الجرأة! انتظر رد المرسل...");insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎯 قبلت تحدي الجرأة! "+ex.desc,msg_type:"text"});}
+        else{T("✅ تم قبول التحدي! "+ex.desc);}
+      },500);
     });
   });
 }
 function rejectGame(msgId){
-  if(!confirm("رفض التحدي؟"))return;
   SB.from("messages").select("extra").eq("id",msgId).single().then(function(r){
     var ex=r.data&&r.data.extra?r.data.extra:{};
     ex.status="rejected";
@@ -1019,6 +1079,141 @@ function rejectGame(msgId){
     });
   });
 }
+
+// ── XO GAME ──
+var xoBoard=[],xoMySymbol="",xoOpSymbol="",xoMyTurn=true,xoGameOver=false;
+function openXO(opponentId){
+  xoBoard=["","","","","","","","",""];
+  xoGameOver=false;
+  // First player (challenger) gets X, second gets O
+  xoMySymbol=CU.id<opponentId?"X":"O";
+  xoOpSymbol=xoMySymbol==="X"?"O":"X";
+  xoMyTurn=xoMySymbol==="X";
+  document.getElementById("xo-my-sym").textContent=xoMySymbol==="X"?"❌":"⭕";
+  document.getElementById("xo-op-sym").textContent=xoOpSymbol==="X"?"❌":"⭕";
+  renderXO();
+  document.getElementById("xo-modal").classList.add("open");
+}
+function renderXO(){
+  var board=document.getElementById("xo-board");
+  board.innerHTML="";
+  for(var i=0;i<9;i++){
+    var cell=document.createElement("button");
+    cell.className="xo-cell"+(xoBoard[i]?" taken":"");
+    cell.textContent=xoBoard[i]==="X"?"❌":xoBoard[i]==="O"?"⭕":"";
+    if(!xoBoard[i]&&!xoGameOver&&xoMyTurn){
+      (function(idx){cell.addEventListener("click",function(){playXO(idx);});})(i);
+    }
+    board.appendChild(cell);
+  }
+  var status=document.getElementById("xo-status");
+  if(xoGameOver){}
+  else if(xoMyTurn)status.textContent="دورك أنت "+(xoMySymbol==="X"?"❌":"⭕");
+  else status.textContent="دور المنافس... ⏳";
+}
+function playXO(idx){
+  if(xoBoard[idx]||xoGameOver||!xoMyTurn)return;
+  xoBoard[idx]=xoMySymbol;
+  xoMyTurn=false;
+  renderXO();
+  var winner=checkXO();
+  var status=document.getElementById("xo-status");
+  if(winner){
+    xoGameOver=true;
+    status.textContent=winner===xoMySymbol?"🏆 أنت الفائز!":"😔 خسرت!";
+    highlightWin(winner);
+    if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 نتيجة XO: "+(winner===xoMySymbol?"فزت! 🏆":"خسرت 😔"),msg_type:"text"});
+    return;
+  }
+  if(xoBoard.every(function(c){return c;})){xoGameOver=true;status.textContent="🤝 تعادل!";if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 تعادل في XO! 🤝",msg_type:"text"});return;}
+  // Simulate opponent move after 1s
+  setTimeout(function(){
+    var empty=[];for(var i=0;i<9;i++){if(!xoBoard[i])empty.push(i);}
+    if(empty.length===0)return;
+    var pick=empty[Math.floor(Math.random()*empty.length)];
+    xoBoard[pick]=xoOpSymbol;
+    xoMyTurn=true;
+    renderXO();
+    var w2=checkXO();
+    if(w2){xoGameOver=true;status.textContent=w2===xoMySymbol?"🏆 أنت الفائز!":"😔 خسرت!";highlightWin(w2);
+      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 نتيجة XO: "+(w2===xoMySymbol?"فزت! 🏆":"خسرت 😔"),msg_type:"text"});
+    } else if(xoBoard.every(function(c){return c;})){xoGameOver=true;status.textContent="🤝 تعادل!";}
+  },800);
+}
+function checkXO(){
+  var lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for(var i=0;i<lines.length;i++){
+    var a=lines[i][0],b=lines[i][1],c=lines[i][2];
+    if(xoBoard[a]&&xoBoard[a]===xoBoard[b]&&xoBoard[a]===xoBoard[c])return xoBoard[a];
+  }return null;
+}
+function highlightWin(sym){
+  var lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  var cells=document.getElementById("xo-board").querySelectorAll(".xo-cell");
+  for(var i=0;i<lines.length;i++){
+    var a=lines[i][0],b=lines[i][1],c=lines[i][2];
+    if(xoBoard[a]===sym&&xoBoard[b]===sym&&xoBoard[c]===sym){
+      cells[a].classList.add("win");cells[b].classList.add("win");cells[c].classList.add("win");
+    }
+  }
+}
+function restartXO(){xoBoard=["","","","","","","","",""];xoGameOver=false;xoMyTurn=xoMySymbol==="X";renderXO();document.getElementById("xo-status").textContent="دورك أنت "+(xoMySymbol==="X"?"❌":"⭕");}
+function closeXO(){document.getElementById("xo-modal").classList.remove("open");}
+
+// ── QUIZ GAME ──
+var QUIZZES=[
+  {q:"ما هي عاصمة العراق؟",opts:["بغداد","البصرة","الموصل","أربيل"],ans:0},
+  {q:"كم يبلغ 7 × 8؟",opts:["54","56","58","64"],ans:1},
+  {q:"ما هو أكبر محيط في العالم؟",opts:["الأطلسي","الهندي","الهادي","المتجمد"],ans:2},
+  {q:"من اخترع الهاتف؟",opts:["إديسون","غراهام بيل","ماركوني","تسلا"],ans:1},
+  {q:"كم عدد أيام السنة الكبيسة؟",opts:["365","366","364","367"],ans:1},
+  {q:"ما هي أصغر قارة؟",opts:["أفريقيا","أستراليا","أوروبا","أنتاركتيكا"],ans:1},
+  {q:"من كتب قصيدة المتنبي الشهيرة؟",opts:["المتنبي","أبو تمام","البحتري","امرؤ القيس"],ans:0},
+  {q:"كم عدد لاعبي فريق كرة القدم؟",opts:["9","10","11","12"],ans:2},
+];
+var quizIdx=0,quizScore=0,quizAnswered=false;
+function openQuiz(){
+  quizIdx=0;quizScore=0;quizAnswered=false;
+  // Shuffle
+  QUIZZES.sort(function(){return Math.random()-.5;});
+  renderQuiz();
+  document.getElementById("quiz-modal").classList.add("open");
+}
+function renderQuiz(){
+  var q=QUIZZES[quizIdx%QUIZZES.length];
+  quizAnswered=false;
+  document.getElementById("quiz-score").textContent="النتيجة: "+quizScore+"/"+quizIdx;
+  document.getElementById("quiz-q").textContent=q.q;
+  document.getElementById("quiz-next").style.display="none";
+  var optsEl=document.getElementById("quiz-opts");optsEl.innerHTML="";
+  q.opts.forEach(function(opt,i){
+    var btn=document.createElement("button");btn.className="quiz-opt";btn.textContent=opt;
+    (function(idx){btn.addEventListener("click",function(){answerQuiz(idx);});})(i);
+    optsEl.appendChild(btn);
+  });
+}
+function answerQuiz(picked){
+  if(quizAnswered)return;quizAnswered=true;
+  var q=QUIZZES[quizIdx%QUIZZES.length];
+  var opts=document.getElementById("quiz-opts").querySelectorAll(".quiz-opt");
+  opts[picked].classList.add(picked===q.ans?"correct":"wrong");
+  if(picked!==q.ans)opts[q.ans].classList.add("correct");
+  if(picked===q.ans)quizScore++;
+  quizIdx++;
+  document.getElementById("quiz-score").textContent="النتيجة: "+quizScore+"/"+quizIdx;
+  document.getElementById("quiz-next").style.display="block";
+}
+function nextQuizQ(){
+  if(quizIdx>=8){
+    document.getElementById("quiz-q").textContent="انتهت الأسئلة! نتيجتك: "+quizScore+"/8";
+    document.getElementById("quiz-opts").innerHTML="";
+    document.getElementById("quiz-next").style.display="none";
+    if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🏆 انتهيت من تحدي الأسئلة! نتيجتي: "+quizScore+"/8",msg_type:"text"});
+    return;
+  }
+  renderQuiz();
+}
+function closeQuiz(){document.getElementById("quiz-modal").classList.remove("open");}
 
 // ── INIT ──
 showPage("pg-auth");
