@@ -496,6 +496,22 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- DARE GAME -->
+<div id="dare-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:250;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+  <div style="background:var(--sur);border:1px solid rgba(239,68,68,.4);border-radius:20px;padding:24px 20px;width:92%;max-width:380px;text-align:center">
+    <div style="font-size:15px;font-weight:900;color:#f97316;margin-bottom:16px">🔥 جرأة أو حقيقة</div>
+    <div id="dare-spinner" style="display:none;font-size:48px;margin:20px 0">🎲</div>
+    <div id="dare-challenge" style="background:linear-gradient(135deg,#1a0000,#2d0000);border:1px solid rgba(239,68,68,.3);border-radius:14px;padding:18px;margin-bottom:16px;min-height:80px;display:flex;align-items:center;justify-content:center">
+      <div id="dare-text" style="font-size:15px;font-weight:700;line-height:1.7;color:var(--txt)">اضغط للحصول على تحدي عشوائي!</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="spinDare()" style="flex:1;background:linear-gradient(135deg,#dc2626,#991b1b);border:none;color:white;font-family:Cairo,sans-serif;font-weight:900;font-size:14px;cursor:pointer;padding:12px;border-radius:10px">🎲 تحدي جديد</button>
+      <button onclick="sendDareResult()" style="flex:1;background:linear-gradient(135deg,#22c55e,#15803d);border:none;color:white;font-family:Cairo,sans-serif;font-weight:900;font-size:14px;cursor:pointer;padding:12px;border-radius:10px">✅ نفّذت!</button>
+    </div>
+    <button onclick="document.getElementById('dare-modal').classList.remove('open')" style="width:100%;padding:10px;margin-top:8px;background:none;border:none;color:var(--mute);font-family:Cairo,sans-serif;font-size:13px;cursor:pointer">إغلاق</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -687,13 +703,15 @@ function renderMsgs(){
     } else if(mtype==="game"||mtype==="xo"){
       var ex=mExtra||m.extra||{};
       var typeNames={"quiz":"❓ أسئلة وأجوبة","xo":"⭕ لعبة XO","dare":"🎯 جرأة أو حقيقة","custom":"✏️ تحدي مخصص"};
-      if(ex.type==="xo-started"){
-        // Game already started - show join button for both
-        var cid=ex.challenger_id,aid=ex.accepter_id;
+      if(ex.type==="xo-started"||ex.type==="game-join"){
+        var gtype=ex.game_type||"xo";
+        var cid=ex.challenger_id||"";
+        var tIcons={"xo":"⭕","quiz":"❓","bball":"🏀","dart":"🎯","dare":"🔥"};
+        var tNames={"xo":"XO","quiz":"أسئلة","bball":"كرة السلة","dart":"رمي السهم","dare":"جرأة"};
         body+='<div class="game-card">'
-          +'<div class="game-title">⭕ جلسة XO نشطة!</div>'
-          +'<div class="game-desc">'+es(ex.desc||"اللعبة جاهزة! اضغط للانضمام")+'</div>'
-          +'<button class="game-play-btn gxo" data-cid="'+cid+'" data-aid="'+aid+'">🎮 العب الآن</button>'
+          +'<div class="game-title">'+(tIcons[gtype]||"🎮")+' '+(tNames[gtype]||"لعبة")+'</div>'
+          +'<div class="game-desc">اللعبة جاهزة! اضغط للانضمام</div>'
+          +'<button class="game-play-btn gjoin" data-gtype="'+gtype+'" data-cid="'+cid+'">🎮 العب الآن</button>'
           +'</div>';
       } else {
         var st=ex.status||"pending";
@@ -738,10 +756,15 @@ function renderMsgs(){
   }
   el.innerHTML=html;
   // Add game button events
-  el.querySelectorAll(".gxo").forEach(function(btn){
+  el.querySelectorAll(".gjoin").forEach(function(btn){
     btn.addEventListener("click",function(){
-      var cid=btn.getAttribute("data-cid");
-      openXO(cid);
+      var gt=btn.getAttribute("data-gtype")||"xo";
+      var cid=btn.getAttribute("data-cid")||CU.id;
+      if(gt==="xo")openXO(cid);
+      else if(gt==="quiz")openQuiz();
+      else if(gt==="bball")openBball();
+      else if(gt==="dart")openDart();
+      else if(gt==="dare")openDare("");
     });
   });
   el.querySelectorAll(".gacc").forEach(function(btn){
@@ -1260,18 +1283,24 @@ function acceptGame(msgId){
       if(CONV)loadMsgs(CONV.id);
       // Send game-start message so BOTH players can join
       var challengerId=r.data.sender_id;
-      if(CONV&&gameType==="xo"){
-        insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 بدأت اللعبة! اضغط 'العب XO' للانضمام",msg_type:"game",extra:{type:"xo-started",challenger_id:challengerId,accepter_id:CU.id,desc:"اللعبة بدأت! كلا اللاعبين يلعبان معاً"}});
-      }
-      // Open the game
+      // Open game for ACCEPTER
       setTimeout(function(){
         if(gameType==="xo")openXO(challengerId);
         else if(gameType==="quiz")openQuiz();
         else if(gameType==="bball")openBball();
         else if(gameType==="dart")openDart();
-        else if(gameType==="dare"){insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🔥 قبلت تحدي الجرأة! "+ex.desc,msg_type:"text"});}
-        else{T("✅ تم قبول التحدي! "+ex.desc);}
-      },500);
+        else if(gameType==="dare")openDare(ex.desc||"");
+        else T("✅ تم قبول التحدي!");
+      },300);
+      // Send message so CHALLENGER also sees "العب الآن" button
+      if(CONV){
+        var tNames={"xo":"⭕ XO","quiz":"❓ أسئلة","bball":"🏀 كرة السلة","dart":"🎯 رمي السهم","dare":"🔥 جرأة"};
+        insertMsg({conversation_id:CONV.id,sender_id:CU.id,
+          content:"✅ قبلت التحدي! "+(tNames[gameType]||"")+" — اضغط للعب",
+          msg_type:"game",
+          extra:{type:"game-join",game_type:gameType,challenger_id:challengerId,accepter_id:CU.id,
+                 desc:"اضغط للعب الآن!"}});
+      }
     });
   });
 }
@@ -1390,7 +1419,7 @@ function openXO(challengerId){
 
 function renderXO(){
   if(!xoSession)return;
-  var board=xoSession.board&&xoSession.board.length===9?xoSession.board:["","","","","","","","",""];
+  var board=Array.isArray(xoSession.board)&&xoSession.board.length===9?xoSession.board:["","","","","","","","",""];
   var isMyTurn=xoSession.current_turn===CU.id;
   var finished=xoSession.status==="finished";
   var st=document.getElementById("xo-status");
@@ -1423,7 +1452,7 @@ function renderXO(){
 
 function playXO(idx){
   if(!xoSession||xoSession.status!=="playing"||xoSession.current_turn!==CU.id)return;
-  var board=xoSession.board&&xoSession.board.length===9?xoSession.board.slice():["","","","","","","","",""];
+  var board=Array.isArray(xoSession.board)&&xoSession.board.length===9?xoSession.board.slice():["","","","","","","","",""];
   if(board[idx])return;
   board[idx]=xoMySymbol;
   var winner=checkXOWin(board);
@@ -1737,26 +1766,90 @@ function restartDart(){
 }
 function closeDart(){document.getElementById("dart-modal").classList.remove("open");}
 
+// ── DARE GAME ──
+var DARES=[
+  "قل شيئاً مضحكاً عن نفسك","غنِّ مقطعاً من أغنية","احكِ أحرج موقف مررت به",
+  "قل شيئاً لم تقله لأحد من قبل","اعمل تقليداً لشخص تعرفه","اكتب رسالة مضحكة لصديق",
+  "قل ثلاث صفات تحبها في نفسك","احكِ أغرب حلم رأيته","قل ما تفكر فيه الآن بصدق",
+  "اذكر شيئاً تخجل من الاعتراف به","اكتب شعراً من سطرين عن الغرفة","قل لماذا أنت أفضل لاعب هنا",
+  "صف شخصية خيالية تريد أن تكونها","اذكر أغرب عادة لديك","قل شيئاً مثيراً للجدل تؤمن به",
+];
+var TRUTHS=[
+  "ما هو أكثر شيء تخجل منه؟","من هو أفضل شخص في حياتك؟","ما هو حلمك الذي لم تحققه؟",
+  "ما الشيء الذي تتمنى لو فعلته؟","ما أول شيء تفعله عند الاستيقاظ؟","ما الذي يجعلك سعيداً حقاً؟",
+  "ما أكثر شيء تندم عليه؟","ما هو خوفك الأكبر؟","ما الهواية التي تتمنى تعلمها؟",
+];
+var curDareText="";
+function openDare(customDesc){
+  if(customDesc){document.getElementById("dare-text").textContent=customDesc;}
+  else{document.getElementById("dare-text").textContent="اضغط للحصول على تحدي عشوائي!";}
+  document.getElementById("dare-modal").classList.add("open");
+}
+function spinDare(){
+  var spinner=document.getElementById("dare-spinner");
+  var textEl=document.getElementById("dare-text");
+  spinner.style.display="block";
+  textEl.textContent="";
+  var spins=0,maxSpins=8;
+  var all=DARES.concat(TRUTHS);
+  var t=setInterval(function(){
+    spins++;
+    textEl.textContent=all[Math.floor(Math.random()*all.length)];
+    if(spins>=maxSpins){
+      clearInterval(t);
+      spinner.style.display="none";
+      // Pick final challenge
+      var isDare=Math.random()>0.4;
+      var list=isDare?DARES:TRUTHS;
+      curDareText=(isDare?"🎯 جرأة: ":"❓ حقيقة: ")+list[Math.floor(Math.random()*list.length)];
+      textEl.textContent=curDareText;
+    }
+  },150);
+}
+function sendDareResult(){
+  if(!curDareText||!CONV){T("اضغط تحدي جديد أولاً");return;}
+  insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🔥 "+curDareText+"... نفّذت! ✅"});
+  T("✅ تم إرسال النتيجة!");
+}
+
 // ── NOTIFICATION SOUND ──
 var _audioCtx=null;
 function initNotifSound(){
-  document.addEventListener("click",function initAudio(){
-    try{_audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}
-    document.removeEventListener("click",initAudio);
-  },{once:true});
+  // Initialize on first user interaction
+  var events=["click","touchstart","keydown"];
+  function init(){
+    try{
+      _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+      if(_audioCtx.state==="suspended")_audioCtx.resume();
+    }catch(e){}
+    events.forEach(function(ev){document.removeEventListener(ev,init);});
+  }
+  events.forEach(function(ev){document.addEventListener(ev,init,{once:true});});
 }
 function playNotifSound(){
   try{
-    if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-    if(_audioCtx.state==="suspended")_audioCtx.resume();
-    [[880,0],[1100,0.1],[880,0.2]].forEach(function(n){
-      var o=_audioCtx.createOscillator(),g=_audioCtx.createGain();
+    if(!_audioCtx){
+      _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    }
+    if(_audioCtx.state==="suspended"){
+      _audioCtx.resume().then(function(){_doPlaySound();});
+      return;
+    }
+    _doPlaySound();
+  }catch(e){console.log("Audio error:",e);}
+}
+function _doPlaySound(){
+  try{
+    var t=_audioCtx.currentTime;
+    [[880,t],[1100,t+0.12],[880,t+0.24]].forEach(function(n){
+      var o=_audioCtx.createOscillator();
+      var g=_audioCtx.createGain();
       o.connect(g);g.connect(_audioCtx.destination);
-      o.frequency.value=n[0];
-      g.gain.setValueAtTime(0.25,_audioCtx.currentTime+n[1]);
-      g.gain.exponentialRampToValueAtTime(0.01,_audioCtx.currentTime+n[1]+0.15);
-      o.start(_audioCtx.currentTime+n[1]);
-      o.stop(_audioCtx.currentTime+n[1]+0.15);
+      o.type="sine";o.frequency.value=n[0];
+      g.gain.setValueAtTime(0,n[1]);
+      g.gain.linearRampToValueAtTime(0.3,n[1]+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,n[1]+0.12);
+      o.start(n[1]);o.stop(n[1]+0.13);
     });
   }catch(e){}
 }
