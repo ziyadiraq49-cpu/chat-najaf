@@ -541,14 +541,30 @@ function sendMsg(){
   }else{insertMsg(data);}
 }
 function insertMsg(data){
-  SB.from("messages").insert([data]).then(function(r){
-    // Reload messages immediately after insert
-    if(CONV){
-      SB.from("messages").select("*").eq("conversation_id",CONV.id).order("created_at",{ascending:true}).then(function(r2){
-        MSGS=r2.data||[];renderMsgs();scrollD();
-      });
+  // Clean data - remove undefined/null file fields if not needed
+  var insertData={
+    conversation_id:data.conversation_id,
+    sender_id:data.sender_id,
+    content:data.content||null,
+    msg_type:data.msg_type||"text",
+    is_read:false
+  };
+  if(data.file_url)insertData.file_url=data.file_url;
+  if(data.file_type)insertData.file_type=data.file_type;
+  if(data.file_name)insertData.file_name=data.file_name;
+  if(data.extra)insertData.extra=data.extra;
+
+  SB.from("messages").insert([insertData]).select().single().then(function(r){
+    if(r.error){T("خطأ في الإرسال: "+r.error.message);return;}
+    // Add immediately to local array
+    if(r.data){
+      var found=false;
+      for(var i=0;i<MSGS.length;i++){if(MSGS[i].id===r.data.id){found=true;break;}}
+      if(!found){MSGS.push(r.data);}
+      renderMsgs();scrollD();
     }
-    SB.from("conversations").update({last_message:data.content||"📎 ملف",last_message_at:new Date().toISOString()}).eq("id",CONV.id).then(function(){});
+    var lastMsg=data.content||(data.msg_type==="voice"?"🎤 رسالة صوتية":(data.msg_type==="game"?"🎮 تحدي":"📎 ملف"));
+    if(CONV)SB.from("conversations").update({last_message:lastMsg,last_message_at:new Date().toISOString()}).eq("id",CONV.id).then(function(){});
   });
 }
 function handleFile(inp){if(inp.files&&inp.files[0]){PF=inp.files[0];T("📎 "+PF.name+" — جاهز للإرسال");}}
