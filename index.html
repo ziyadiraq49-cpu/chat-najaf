@@ -113,6 +113,43 @@ body{display:flex;flex-direction:column}
 .adm-conv-item{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.4);cursor:pointer;transition:background .1s}
 .adm-conv-item:active{background:var(--sur2)}
 .stat-g{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+
+/* PROFILE PAGE */
+#pg-profile{flex-direction:column;min-height:100vh}
+.prof-cover{background:linear-gradient(135deg,#1d4ed8,#7c3aed);height:120px;position:relative;flex-shrink:0}
+.prof-av-wrap{position:absolute;bottom:-36px;right:20px;width:72px;height:72px;border-radius:20px;border:3px solid var(--bg);overflow:hidden;cursor:pointer;background:var(--sur2)}
+.prof-av-wrap img{width:100%;height:100%;object-fit:cover}
+.prof-av-wrap .av-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:white}
+.prof-body{padding:48px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.prof-name{font-size:20px;font-weight:900}
+.prof-username{font-size:13px;color:var(--blue);margin-top:2px}
+.prof-bio{font-size:13px;color:var(--mute);line-height:1.7;margin-top:4px}
+.prof-edit-card{background:var(--sur);border:1px solid var(--bdr);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.pflbl{font-size:11px;color:var(--mute);font-weight:600;margin-bottom:4px;display:block}
+.pfinp{width:100%;background:var(--bg);border:1.5px solid var(--bdr);color:var(--txt);font-family:"Cairo",sans-serif;border-radius:9px;padding:10px 13px;outline:none;font-size:14px;-webkit-appearance:none;transition:border-color .2s}
+.pfinp:focus{border-color:var(--blue)}
+.pfinp::placeholder{color:var(--dim)}
+.save-btn{background:var(--blue);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:900;font-size:14px;cursor:pointer;padding:12px;border-radius:10px;width:100%}
+
+/* VOICE */
+.voice-btn{width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;transition:all .2s;flex-shrink:0}
+.voice-btn.idle{background:var(--sur2)}
+.voice-btn.recording{background:var(--red);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.voice-msg{display:flex;align-items:center;gap:8px;padding:4px 0}
+.play-btn{background:rgba(255,255,255,.2);border:none;color:white;cursor:pointer;width:32px;height:32px;border-radius:50%;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.other .play-btn{background:rgba(88,166,255,.2);color:var(--blue)}
+.voice-wave{flex:1;height:3px;background:rgba(255,255,255,.3);border-radius:3px}
+.other .voice-wave{background:var(--bdr)}
+.voice-dur{font-size:10px;opacity:.7}
+
+/* GAME CHALLENGE */
+.game-card{background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);border-radius:12px;padding:14px;margin-top:4px}
+.game-title{font-size:13px;font-weight:900;color:#a78bfa;margin-bottom:8px}
+.game-desc{font-size:12px;color:var(--mute);margin-bottom:10px;line-height:1.6}
+.game-btns{display:flex;gap:8px}
+.game-accept{background:linear-gradient(135deg,#7c3aed,#4c1d95);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:700;font-size:12px;cursor:pointer;padding:8px 14px;border-radius:8px;flex:1}
+.game-reject{background:var(--sur2);border:1px solid var(--bdr);color:var(--mute);font-family:"Cairo",sans-serif;font-size:12px;cursor:pointer;padding:8px 14px;border-radius:8px}
 .stat-card{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:16px;text-align:center}
 .stat-val{font-size:28px;font-weight:900;color:#ff6b35;display:block;margin-bottom:4px}
 .stat-lbl{font-size:12px;color:var(--mute)}
@@ -158,6 +195,7 @@ body{display:flex;flex-direction:column}
     </div>
     <div class="hdr-r">
       <button class="ibtn" onclick="openSearch()" title="محادثة جديدة">✏️</button>
+      <button class="ibtn" onclick="openProfile()" title="ملفي الشخصي" style="font-size:16px">👤</button>
       <button class="ibtn" onclick="doLogout()" title="خروج" style="font-size:16px">🚪</button>
     </div>
   </div>
@@ -179,8 +217,34 @@ body{display:flex;flex-direction:column}
   <div class="inp-area">
     <button class="abtn" onclick="document.getElementById('finp').click()">📎</button>
     <input type="file" id="finp" accept="image/*" style="display:none" onchange="handleFile(this)">
+    <button class="abtn" onclick="openGameChallenge()" title="تحدي">🎮</button>
     <textarea class="minp" id="minp" placeholder="اكتب رسالة..." rows="1" onkeydown="onKey(event)"></textarea>
+    <button class="voice-btn idle" id="voice-btn" title="رسالة صوتية"
+      ontouchstart="startRecord(event)" ontouchend="stopRecord(event)"
+      onmousedown="startRecord(event)" onmouseup="stopRecord(event)">🎤</button>
     <button class="sbtn" onclick="sendMsg()">➤</button>
+  </div>
+  <!-- Game Modal -->
+  <div id="game-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)">
+    <div style="background:var(--sur);border:1px solid rgba(124,58,237,.4);border-radius:18px 18px 0 0;width:100%;max-width:600px;padding:20px 18px;max-height:70vh;overflow-y:auto">
+      <div style="width:36px;height:3px;background:var(--bdr);border-radius:2px;margin:0 auto 16px"></div>
+      <div style="font-size:15px;font-weight:900;margin-bottom:14px;color:#a78bfa">🎮 إرسال تحدي</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div><label class="pflbl">نوع التحدي</label>
+          <select class="pfinp" id="game-type">
+            <option value="quiz">❓ أسئلة وأجوبة</option>
+            <option value="xo">⭕ لعبة XO</option>
+            <option value="dare">🎯 جرأة أو حقيقة</option>
+            <option value="custom">✏️ تحدي مخصص</option>
+          </select>
+        </div>
+        <div><label class="pflbl">وصف التحدي</label><textarea class="pfinp" id="game-desc" rows="3" placeholder="اكتب تفاصيل التحدي..." style="resize:none;line-height:1.6"></textarea></div>
+        <div style="display:flex;gap:8px">
+          <button onclick="sendGameChallenge()" style="flex:1;background:linear-gradient(135deg,#7c3aed,#4c1d95);border:none;color:white;font-family:Cairo,sans-serif;font-weight:900;font-size:14px;cursor:pointer;padding:12px;border-radius:10px">إرسال التحدي 🎮</button>
+          <button onclick="closeGameModal()" style="flex:1;background:var(--sur2);border:1px solid var(--bdr);color:var(--mute);font-family:Cairo,sans-serif;font-size:13px;cursor:pointer;padding:12px;border-radius:10px">إلغاء</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -196,6 +260,42 @@ body{display:flex;flex-direction:column}
 
 <!-- IMG VIEW -->
 <div id="img-view" onclick="closeImg()"><img id="iv-img" src=""></div>
+
+<!-- PROFILE PAGE -->
+<div class="page" id="pg-profile">
+  <div class="hdr">
+    <div class="hdr-l">
+      <button class="ibtn" onclick="showPage('pg-list')" style="font-size:24px">‹</button>
+      <div class="htitle">الملف الشخصي</div>
+    </div>
+    <button class="ibtn" onclick="saveProfile()" style="color:var(--blue);font-size:13px;font-weight:700">حفظ</button>
+  </div>
+  <div class="prof-cover">
+    <div class="prof-av-wrap" onclick="changeAvatar()">
+      <div class="av-placeholder" id="prof-av-placeholder"></div>
+      <img id="prof-av-img" src="" style="display:none">
+      <input type="file" id="av-file" accept="image/*" style="display:none" onchange="handleAvatar(this)">
+    </div>
+  </div>
+  <div class="prof-body">
+    <div class="prof-edit-card">
+      <div style="font-size:14px;font-weight:900;margin-bottom:4px">معلومات الحساب</div>
+      <div><label class="pflbl">الاسم الكامل</label><input class="pfinp" id="pf-name" type="text" placeholder="اسمك الكامل"></div>
+      <div><label class="pflbl">المعرف @username</label>
+        <div style="position:relative"><span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--mute);font-size:14px">@</span>
+        <input class="pfinp" id="pf-username" type="text" placeholder="معرفك الخاص" style="padding-right:30px" autocomplete="off"></div>
+      </div>
+      <div><label class="pflbl">السيرة الذاتية</label><textarea class="pfinp" id="pf-bio" rows="3" placeholder="نبذة عنك..." style="resize:none;line-height:1.6"></textarea></div>
+    </div>
+    <div class="prof-edit-card">
+      <div style="font-size:14px;font-weight:900;margin-bottom:4px">🔒 تغيير كلمة المرور</div>
+      <div><label class="pflbl">كلمة المرور الجديدة</label><input class="pfinp" id="pf-pw" type="password" placeholder="6 أحرف على الأقل"></div>
+      <div><label class="pflbl">تأكيد كلمة المرور</label><input class="pfinp" id="pf-pw2" type="password" placeholder="••••••••"></div>
+      <button class="save-btn" onclick="changePw()" style="background:#7c3aed">تغيير كلمة المرور</button>
+    </div>
+    <div id="prof-msg" style="display:none;font-size:13px;padding:10px;border-radius:9px;text-align:center"></div>
+  </div>
+</div>
 
 <!-- ADMIN PANEL -->
 <div class="page" id="pg-admin">
@@ -371,14 +471,27 @@ function renderMsgs(){
     if(ds!==ld){html+='<div class="dsep">'+ds+'</div>';ld=ds;}
     var tm=d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");
     var body="";
-    if(m.file_url){
-      if(m.file_type&&m.file_type.slice(0,5)==="image"){
-        body+='<img class="mimg" src="'+es(m.file_url)+'" onclick="openImg(this.src)" loading="lazy">';
-      }else{
-        body+='<a href="'+es(m.file_url)+'" target="_blank" style="color:'+(me?"#fff":"var(--blue)")+';font-size:12px">📎 '+(m.file_name||"ملف")+'</a>';
+    var mtype=m.msg_type||"text";
+    if(mtype==="voice"&&m.file_url){
+      body+='<div class="voice-msg"><button class="play-btn vplay" data-url="'+es(m.file_url)+'">▶</button><div class="voice-wave"></div><span class="voice-dur">'+(m.extra&&m.extra.dur?m.extra.dur+"ث":"")+'</span></div>';
+    } else if(mtype==="game"){
+      var ex=m.extra||{};
+      var typeNames={"quiz":"❓ أسئلة وأجوبة","xo":"⭕ لعبة XO","dare":"🎯 جرأة أو حقيقة","custom":"✏️ تحدي مخصص"};
+      body+='<div class="game-card"><div class="game-title">🎮 '+( typeNames[ex.type]||"تحدي")+'</div>'
+        +'<div class="game-desc">'+es(ex.desc||"")+'</div>'
+        +(me?'<div style="font-size:11px;color:var(--mute)">في انتظار الرد...</div>'
+          :'<div class="game-btns"><button class="game-accept gacc" data-mid="'+m.id+'">✅ قبول التحدي</button><button class="game-reject grej" data-mid="'+m.id+'">❌ رفض</button></div>')
+        +'</div>';
+    } else {
+      if(m.file_url){
+        if(m.file_type&&m.file_type.slice(0,5)==="image"){
+          body+='<img class="mimg" src="'+es(m.file_url)+'" onclick="openImg(this.src)" loading="lazy">';
+        }else{
+          body+='<a href="'+es(m.file_url)+'" target="_blank" style="color:'+(me?"#fff":"var(--blue)")+';font-size:12px">📎 '+(m.file_name||"ملف")+'</a>';
+        }
       }
+      if(m.content)body+='<div class="mtxt">'+es(m.content)+'</div>';
     }
-    if(m.content)body+='<div class="mtxt">'+es(m.content)+'</div>';
     html+='<div class="mrow '+(me?"me":"other")+'">'
       +(me?"":'<div class="mav" style="background:'+col(m.sender_id)+'">'+pnm+'</div>')
       +'<div class="bbl">'+body+'<div class="mtime">'+tm+(me?" · "+(m.is_read?"✓✓":"✓"):"")+'</div></div>'
@@ -613,6 +726,15 @@ function openAdmChat(conv,title,profs){
       mEl.appendChild(row);
     });
     mEl.scrollTop=mEl.scrollHeight;
+  mEl.querySelectorAll(".vplay").forEach(function(btn){
+    btn.addEventListener("click",function(){playVoice(btn.dataset.url,btn);});
+  });
+  mEl.querySelectorAll(".gacc").forEach(function(btn){
+    btn.addEventListener("click",function(){acceptGame(btn.dataset.mid);});
+  });
+  mEl.querySelectorAll(".grej").forEach(function(btn){
+    btn.addEventListener("click",function(){rejectGame(btn.dataset.mid);});
+  });
   });
 }
 
@@ -670,6 +792,153 @@ function loadAdmStats(){
       +'<div class="stat-card"><span class="stat-val">'+msgs+'</span><span class="stat-lbl">رسالة</span></div>'
       +'<div class="stat-card"><span class="stat-val" style="font-size:20px">🛡️</span><span class="stat-lbl">مالك التطبيق</span></div>'
       +'</div>';
+  });
+}
+
+// ── PROFILE ──
+function openProfile(){
+  if(!CU)return;
+  var meta=CU.user_metadata||{};
+  G("pf-name").value=meta.full_name||"";
+  G("pf-bio").value="";G("pf-pw").value="";G("pf-pw2").value="";
+  G("prof-msg").style.display="none";
+  // Load from profiles table
+  SB.from("profiles").select("*").eq("id",CU.id).single().then(function(r){
+    if(r.data){
+      G("pf-name").value=r.data.full_name||"";
+      G("pf-username").value=r.data.username||"";
+      G("pf-bio").value=r.data.bio||"";
+      var nm=(r.data.full_name||"م")[0].toUpperCase();
+      G("prof-av-placeholder").textContent=nm;
+      G("prof-av-placeholder").style.background=col(CU.id);
+      if(r.data.avatar_url){
+        G("prof-av-img").src=r.data.avatar_url;
+        G("prof-av-img").style.display="block";
+        G("prof-av-placeholder").style.display="none";
+      }
+    }
+  });
+  showPage("pg-profile");
+}
+function changeAvatar(){G("av-file").click();}
+function handleAvatar(inp){
+  if(!inp.files||!inp.files[0])return;
+  var file=inp.files[0];
+  var path="avatars/"+CU.id+"_"+Date.now()+"."+( file.name.split(".").pop()||"jpg");
+  SB.storage.from("products").upload(path,file,{upsert:true,contentType:file.type}).then(function(r){
+    if(r.error){T("فشل رفع الصورة");return;}
+    var url=SB.storage.from("products").getPublicUrl(path).data.publicUrl;
+    G("prof-av-img").src=url;G("prof-av-img").style.display="block";
+    G("prof-av-placeholder").style.display="none";
+    SB.from("profiles").update({avatar_url:url}).eq("id",CU.id).then(function(){T("✅ تم تغيير الصورة");});
+  });
+}
+function saveProfile(){
+  var nm=G("pf-name").value.trim();
+  var un=G("pf-username").value.trim().replace(/[^a-zA-Z0-9_]/g,"");
+  var bio=G("pf-bio").value.trim();
+  if(!nm){T("يرجى إدخال الاسم");return;}
+  SB.from("profiles").update({full_name:nm,username:un||null,bio:bio||null}).eq("id",CU.id).then(function(r){
+    if(r.error){showProfMsg("خطأ: "+r.error.message,false);return;}
+    SB.auth.updateUser({data:{full_name:nm}}).then(function(){
+      showProfMsg("✅ تم حفظ الملف الشخصي",true);
+      var av=G("my-av");if(av)av.textContent=nm[0].toUpperCase();
+    });
+  });
+}
+function changePw(){
+  var pw=G("pf-pw").value,pw2=G("pf-pw2").value;
+  if(!pw||!pw2){T("يرجى ملء الحقلين");return;}
+  if(pw.length<6){T("كلمة المرور 6 أحرف على الأقل");return;}
+  if(pw!==pw2){T("كلمتا المرور غير متطابقتين");return;}
+  SB.auth.updateUser({password:pw}).then(function(r){
+    if(r.error){showProfMsg("خطأ: "+r.error.message,false);}
+    else{showProfMsg("✅ تم تغيير كلمة المرور",true);G("pf-pw").value="";G("pf-pw2").value="";}
+  });
+}
+function showProfMsg(msg,ok){
+  var el=G("prof-msg");el.textContent=msg;
+  el.style.background=ok?"#052e16":"#1a0505";
+  el.style.color=ok?"#22c55e":"#ef4444";
+  el.style.display="block";
+  setTimeout(function(){el.style.display="none";},3000);
+}
+
+// ── VOICE ──
+var mediaRec=null,audioChunks=[],recStart=0,recTimer=null;
+function startRecord(e){
+  e.preventDefault();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){T("المتصفح لا يدعم التسجيل");return;}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    audioChunks=[];recStart=Date.now();
+    mediaRec=new MediaRecorder(stream);
+    mediaRec.ondataavailable=function(e){if(e.data.size>0)audioChunks.push(e.data);};
+    mediaRec.onstop=function(){
+      var blob=new Blob(audioChunks,{type:"audio/webm"});
+      var dur=Math.round((Date.now()-recStart)/1000);
+      uploadVoice(blob,dur);
+      stream.getTracks().forEach(function(t){t.stop();});
+    };
+    mediaRec.start();
+    G("voice-btn").classList.remove("idle");G("voice-btn").classList.add("recording");
+    G("voice-btn").textContent="⏹";
+    recTimer=setInterval(function(){
+      var s=Math.round((Date.now()-recStart)/1000);
+      if(s>=60)stopRecord({preventDefault:function(){}});
+    },1000);
+  }).catch(function(){T("لا يمكن الوصول للميكروفون");});
+}
+function stopRecord(e){
+  e.preventDefault();
+  if(recTimer){clearInterval(recTimer);recTimer=null;}
+  if(mediaRec&&mediaRec.state==="recording"){mediaRec.stop();}
+  G("voice-btn").classList.remove("recording");G("voice-btn").classList.add("idle");G("voice-btn").textContent="🎤";
+}
+function uploadVoice(blob,dur){
+  if(!CONV)return;
+  var path="voices/"+CU.id+"_"+Date.now()+".webm";
+  SB.storage.from("voices").upload(path,blob,{upsert:true,contentType:"audio/webm"}).then(function(r){
+    if(r.error){T("فشل رفع الصوت");return;}
+    var url=SB.storage.from("voices").getPublicUrl(path).data.publicUrl;
+    insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:null,msg_type:"voice",file_url:url,extra:{dur:dur}});
+  });
+}
+var curAudio=null;
+function playVoice(url,btn){
+  if(curAudio){curAudio.pause();curAudio=null;
+    document.querySelectorAll(".play-btn").forEach(function(b){b.textContent="▶";});
+  }
+  curAudio=new Audio(url);
+  btn.textContent="⏸";
+  curAudio.play();
+  curAudio.onended=function(){btn.textContent="▶";curAudio=null;};
+}
+
+// ── GAME CHALLENGE ──
+function openGameChallenge(){
+  if(!CONV){T("افتح محادثة أولاً");return;}
+  G("game-modal").style.display="flex";
+  G("game-desc").value="";
+}
+function closeGameModal(){G("game-modal").style.display="none";}
+function sendGameChallenge(){
+  var type=G("game-type").value;
+  var desc=G("game-desc").value.trim();
+  if(!desc){T("يرجى وصف التحدي");return;}
+  var typeNames={"quiz":"أسئلة وأجوبة","xo":"لعبة XO","dare":"جرأة أو حقيقة","custom":"تحدي مخصص"};
+  insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 تحدي: "+typeNames[type],msg_type:"game",extra:{type:type,desc:desc,status:"pending"}});
+  closeGameModal();
+}
+function acceptGame(msgId){
+  SB.from("messages").update({extra:{status:"accepted"}}).eq("id",msgId).then(function(){
+    T("✅ قبلت التحدي! ابدأ اللعب 🎮");
+    insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"✅ قبلت التحدي! لنبدأ 🎮",msg_type:"text"});
+  });
+}
+function rejectGame(msgId){
+  SB.from("messages").update({extra:{status:"rejected"}}).eq("id",msgId).then(function(){
+    T("❌ رفضت التحدي");
+    insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"❌ رفضت التحدي",msg_type:"text"});
   });
 }
 
