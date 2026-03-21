@@ -101,6 +101,25 @@ body{display:flex;flex-direction:column}
 /* TOAST */
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--blue);color:white;font-family:"Cairo",sans-serif;font-weight:700;font-size:12px;padding:9px 18px;border-radius:24px;z-index:300;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ADMIN */
+#pg-admin{flex-direction:column;min-height:100vh;background:#060a0f}
+.adm-hdr{background:#0d1117;border-bottom:1px solid #ff6b35;padding:0 16px;height:58px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:10}
+.adm-title{font-size:15px;font-weight:900;color:#ff6b35}
+.adm-tabs{display:flex;gap:6px;padding:12px 16px;overflow-x:auto;border-bottom:1px solid var(--bdr);flex-shrink:0}
+.adm-tab{white-space:nowrap;padding:7px 14px;border:1px solid var(--bdr);border-radius:20px;font-family:"Cairo",sans-serif;font-size:12px;font-weight:700;cursor:pointer;background:var(--sur);color:var(--mute);transition:all .2s}
+.adm-tab.on{background:#ff6b35;color:white;border-color:#ff6b35}
+.adm-content{flex:1;overflow-y:auto}
+.adm-conv-item{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.4);cursor:pointer;transition:background .1s}
+.adm-conv-item:active{background:var(--sur2)}
+.stat-g{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+.stat-card{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:16px;text-align:center}
+.stat-val{font-size:28px;font-weight:900;color:#ff6b35;display:block;margin-bottom:4px}
+.stat-lbl{font-size:12px;color:var(--mute)}
+.broadcast-box{margin:16px;background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.btxt{width:100%;background:var(--bg);border:1.5px solid var(--bdr);color:var(--txt);font-family:"Cairo",sans-serif;border-radius:9px;padding:11px;outline:none;font-size:13px;resize:none;-webkit-appearance:none;transition:border-color .2s}
+.btxt:focus{border-color:#ff6b35}
+.bcast-btn{background:#ff6b35;border:none;color:white;font-family:"Cairo",sans-serif;font-weight:900;font-size:14px;cursor:pointer;padding:12px;border-radius:9px;width:100%}
 </style>
 </head>
 <body>
@@ -177,6 +196,32 @@ body{display:flex;flex-direction:column}
 
 <!-- IMG VIEW -->
 <div id="img-view" onclick="closeImg()"><img id="iv-img" src=""></div>
+
+<!-- ADMIN PANEL -->
+<div class="page" id="pg-admin">
+  <div class="adm-hdr">
+    <div style="font-size:14px;font-weight:900;color:#ff6b35">🛡️ لوحة تحكم المالك</div>
+    <button class="ibtn" onclick="exitAdmin()" style="color:#ff6b35;font-size:13px;font-weight:700">← خروج</button>
+  </div>
+  <div class="adm-tabs">
+    <button class="adm-tab on" onclick="admTab('convs')">💬 المحادثات</button>
+    <button class="adm-tab" onclick="admTab('broadcast')">📢 رسالة جماعية</button>
+    <button class="adm-tab" onclick="admTab('stats')">📊 إحصائيات</button>
+  </div>
+  <div class="adm-content" id="adm-content"></div>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div id="adm-login-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
+  <div style="background:var(--sur);border:1px solid #ff6b35;border-radius:16px;padding:28px 22px;width:100%;max-width:360px">
+    <div style="text-align:center;margin-bottom:20px"><div style="font-size:44px;margin-bottom:8px">🛡️</div><div style="font-size:16px;font-weight:900;color:#ff6b35">دخول المالك</div></div>
+    <input class="finp" id="adm-pw-inp" type="password" placeholder="كلمة مرور المالك" style="margin-bottom:10px">
+    <div class="ferr" id="adm-pw-err" style="margin-bottom:10px"></div>
+    <button class="fbtn" onclick="doAdmLogin()" style="background:#ff6b35">دخول</button>
+    <button onclick="closeAdmLogin()" style="width:100%;padding:10px;margin-top:8px;background:none;border:none;color:var(--mute);font-family:Cairo,sans-serif;font-size:13px;cursor:pointer">إلغاء</button>
+    <div style="text-align:center;font-size:11px;color:var(--dim);margin-top:12px">كلمة المرور الافتراضية: <b style="color:#ff6b35">admin1234</b></div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -447,6 +492,186 @@ function startConv(profile){
 // ── IMG ──
 function openImg(url){G("iv-img").src=url;G("img-view").classList.add("open");}
 function closeImg(){G("img-view").classList.remove("open");}
+
+// ── ADMIN ──
+var ADM_PW_KEY="chat_adm_v1";
+function hp(p){var h=0;for(var i=0;i<p.length;i++)h=(Math.imul(31,h)+p.charCodeAt(i))|0;return"h"+Math.abs(h).toString(36)+p.length;}
+function getAdmPw(){return localStorage.getItem(ADM_PW_KEY)||hp("admin1234");}
+
+// 5 taps on logo to open admin
+var _taps=0,_tapT=null;
+G("my-av").addEventListener("click",function(){
+  _taps++;if(_tapT)clearTimeout(_tapT);
+  _tapT=setTimeout(function(){_taps=0;},1500);
+  if(_taps>=5){_taps=0;openAdmLogin();}
+});
+
+function openAdmLogin(){
+  var ov=G("adm-login-ov");
+  ov.style.display="flex";
+  G("adm-pw-inp").value="";
+}
+function closeAdmLogin(){G("adm-login-ov").style.display="none";}
+function doAdmLogin(){
+  var pw=G("adm-pw-inp").value;
+  if(hp(pw)!==getAdmPw()){G("adm-pw-err").textContent="كلمة المرور غير صحيحة";G("adm-pw-err").style.display="block";setTimeout(function(){G("adm-pw-err").style.display="none";},2500);return;}
+  closeAdmLogin();
+  showPage("pg-admin");
+  admTab("convs");
+}
+function exitAdmin(){showPage("pg-list");}
+
+function admTab(t){
+  document.querySelectorAll(".adm-tab").forEach(function(b,i){b.classList.toggle("on",["convs","broadcast","stats"][i]===t);});
+  if(t==="convs")loadAdmConvs();
+  else if(t==="broadcast")showBroadcast();
+  else if(t==="stats")loadAdmStats();
+}
+
+function loadAdmConvs(){
+  var el=G("adm-content");
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--mute)">جاري التحميل...</div>';
+  SB.from("conversations").select("*").order("last_message_at",{ascending:false}).then(function(r){
+    var convs=r.data||[];
+    // Load all profiles
+    SB.from("profiles").select("id,full_name,email").then(function(rp){
+      var profs=rp.data||[];
+      function getPN(id){for(var i=0;i<profs.length;i++){if(profs[i].id===id)return profs[i].full_name||profs[i].email||"مستخدم";}return "مستخدم";}
+      if(!convs.length){el.innerHTML='<div class="empty"><div class="ei">💬</div><div>لا توجد محادثات</div></div>';return;}
+      el.innerHTML="";
+      convs.forEach(function(c,idx){
+        var n1=getPN(c.user1_id),n2=getPN(c.user2_id);
+        var item=document.createElement("div");item.className="adm-conv-item";
+        item.innerHTML='<div class="cav" style="background:'+col(c.user1_id)+';width:42px;height:42px;font-size:16px;border-radius:11px">'+n1[0].toUpperCase()+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:13px;font-weight:700">'+es(n1)+' & '+es(n2)+'</div>'
+          +'<div style="font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(c.last_message||"—")+'</div></div>'
+          +'<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">'
+          +'<div style="font-size:10px;color:var(--dim)">'+ft(c.last_message_at)+'</div>'
+          +'<div style="display:flex;gap:5px">'
+          +'<button class="adm-open-btn" style="background:#ff6b35;border:none;color:white;font-family:Cairo,sans-serif;font-size:10px;font-weight:700;border-radius:6px;padding:4px 9px;cursor:pointer">فتح</button>'
+          +'<button class="adm-del-btn" style="background:#7f1d1d;border:none;color:#ef4444;font-family:Cairo,sans-serif;font-size:10px;font-weight:700;border-radius:6px;padding:4px 9px;cursor:pointer">حذف</button>'
+          +'</div></div>';
+        item.querySelector(".adm-open-btn").addEventListener("click",function(e){
+          e.stopPropagation();
+          openAdmChat(c,n1+" & "+n2,profs);
+        });
+        (function(conv){
+          item.querySelector(".adm-del-btn").addEventListener("click",function(e){
+            e.stopPropagation();
+            if(!confirm("حذف محادثة "+n1+" & "+n2+" وكل رسائلها؟"))return;
+            SB.from("messages").delete().eq("conversation_id",conv.id).then(function(){
+              SB.from("conversations").delete().eq("id",conv.id).then(function(){
+                T("تم حذف المحادثة");loadAdmConvs();
+              });
+            });
+          });
+        })(c);
+        el.appendChild(item);
+      });
+    });
+  });
+}
+
+function openAdmChat(conv,title,profs){
+  function getPN(id){for(var i=0;i<profs.length;i++){if(profs[i].id===id)return profs[i];}return {full_name:"مستخدم",email:""};}
+  var el=G("adm-content");
+  el.innerHTML='<div style="background:var(--sur);border-bottom:1px solid var(--bdr);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0">'
+    +'<button id="adm-back-btn" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:22px;line-height:1">‹</button>'
+    +'<div style="font-size:14px;font-weight:700">'+es(title)+'</div></div>'
+    +'<div id="adm-msgs" style="padding:12px;display:flex;flex-direction:column;gap:5px"></div>'
+    +'<div style="background:var(--sur);border-top:1px solid var(--bdr);padding:10px 12px;display:flex;gap:8px">'
+    +'<textarea id="adm-minp" class="minp" placeholder="اكتب ردك كمالك..." rows="1" style="flex:1"></textarea>'
+    +'<button id="adm-sbtn" class="sbtn" style="background:#ff6b35">➤</button></div>';
+  G("adm-back-btn").addEventListener("click",function(){admTab("convs");});
+  G("adm-sbtn").addEventListener("click",function(){sendAdmMsg(conv.id);});
+  G("adm-minp").addEventListener("input",function(){this.style.height="auto";this.style.height=Math.min(this.scrollHeight,100)+"px";});
+  G("adm-minp").addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendAdmMsg(conv.id);}});
+  SB.from("messages").select("*").eq("conversation_id",conv.id).order("created_at",{ascending:true}).then(function(r){
+    var msgs=r.data||[];var mEl=G("adm-msgs");
+    if(!msgs.length){mEl.innerHTML='<div class="empty" style="padding:20px"><div style="font-size:13px">لا توجد رسائل</div></div>';return;}
+    var html="";
+    mEl.innerHTML="";
+    msgs.forEach(function(m){
+      var p=getPN(m.sender_id);var pnm=(p.full_name||"مستخدم");
+      var pav=(pnm[0]||"م").toUpperCase();
+      var t=new Date(m.created_at);var tm=t.getHours()+":"+String(t.getMinutes()).padStart(2,"0");
+      var row=document.createElement("div");row.className="mrow other";row.style.alignItems="flex-start";
+      row.innerHTML='<div class="mav" style="background:'+col(m.sender_id)+'">'+pav+'</div>'
+        +'<div class="bbl other" style="flex:1"><div style="font-size:10px;color:var(--blue);margin-bottom:3px;font-weight:700">'+es(pnm)+'</div>'
+        +(m.content?'<div class="mtxt">'+es(m.content)+'</div>':'')
+        +'<div class="mtime">'+tm+'</div></div>'
+        +'<button class="del-msg-btn" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px;padding:4px;flex-shrink:0;opacity:.5" title="حذف">🗑</button>';
+      (function(mid){
+        row.querySelector(".del-msg-btn").addEventListener("click",function(){
+          if(!confirm("حذف هذه الرسالة؟"))return;
+          SB.from("messages").delete().eq("id",mid).then(function(){
+            row.remove();T("تم حذف الرسالة");
+          });
+        });
+      })(m.id);
+      mEl.appendChild(row);
+    });
+    mEl.scrollTop=mEl.scrollHeight;
+  });
+}
+
+function sendAdmMsg(convId){
+  var inp=G("adm-minp");if(!inp)return;
+  var text=inp.value.trim();if(!text)return;
+  inp.value="";inp.style.height="auto";
+  SB.from("messages").insert([{conversation_id:convId,sender_id:CU.id,content:text}]).then(function(){
+    SB.from("conversations").update({last_message:text,last_message_at:new Date().toISOString()}).eq("id",convId).then(function(){});
+    T("✓ تم إرسال الرد");
+  });
+}
+
+function showBroadcast(){
+  G("adm-content").innerHTML='<div class="broadcast-box">'
+    +'<div style="font-size:14px;font-weight:900;margin-bottom:8px">📢 رسالة جماعية لجميع المستخدمين</div>'
+    +'<textarea class="btxt" id="bcast-txt" rows="5" placeholder="اكتب الرسالة الجماعية هنا..."></textarea>'
+    +'<button class="bcast-btn" onclick="sendBroadcast()">إرسال للجميع</button>'
+    +'<div id="bcast-result"></div></div>';
+}
+function sendBroadcast(){
+  var msg=G("bcast-txt").value.trim();
+  if(!msg){T("يرجى كتابة رسالة");return;}
+  if(!confirm("إرسال هذه الرسالة لجميع المستخدمين؟"))return;
+  G("bcast-result").textContent="جاري الإرسال...";G("bcast-result").style.color="var(--mute)";
+  // Get all users and create/find convs with each
+  SB.from("profiles").select("id").neq("id",CU.id).then(function(r){
+    var users=r.data||[];var count=0;
+    users.forEach(function(u){
+      var u1=CU.id<u.id?CU.id:u.id;var u2=CU.id<u.id?u.id:CU.id;
+      SB.from("conversations").upsert([{user1_id:u1,user2_id:u2}],{onConflict:"user1_id,user2_id"}).select().single().then(function(rc){
+        if(rc.data){
+          SB.from("messages").insert([{conversation_id:rc.data.id,sender_id:CU.id,content:msg}]).then(function(){
+            SB.from("conversations").update({last_message:msg,last_message_at:new Date().toISOString()}).eq("id",rc.data.id).then(function(){});
+            count++;G("bcast-result").textContent="تم الإرسال لـ "+count+" مستخدم";G("bcast-result").style.color="var(--grn)";
+          });
+        }
+      });
+    });
+    if(!users.length){G("bcast-result").textContent="لا يوجد مستخدمون";G("bcast-result").style.color="var(--red)";}
+  });
+}
+
+function loadAdmStats(){
+  G("adm-content").innerHTML='<div style="text-align:center;padding:20px;color:var(--mute)">جاري التحميل...</div>';
+  Promise.all([
+    SB.from("profiles").select("id",{count:"exact"}),
+    SB.from("messages").select("id",{count:"exact"}),
+    SB.from("conversations").select("id",{count:"exact"})
+  ]).then(function(results){
+    var users=results[0].count||0,msgs=results[1].count||0,convs=results[2].count||0;
+    G("adm-content").innerHTML='<div class="stat-g">'
+      +'<div class="stat-card"><span class="stat-val">'+users+'</span><span class="stat-lbl">مستخدم</span></div>'
+      +'<div class="stat-card"><span class="stat-val">'+convs+'</span><span class="stat-lbl">محادثة</span></div>'
+      +'<div class="stat-card"><span class="stat-val">'+msgs+'</span><span class="stat-lbl">رسالة</span></div>'
+      +'<div class="stat-card"><span class="stat-val" style="font-size:20px">🛡️</span><span class="stat-lbl">مالك التطبيق</span></div>'
+      +'</div>';
+  });
+}
 
 // ── INIT ──
 showPage("pg-auth");
