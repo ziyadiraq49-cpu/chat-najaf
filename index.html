@@ -131,6 +131,38 @@ body{display:flex;flex-direction:column}
 .pfinp::placeholder{color:var(--dim)}
 .save-btn{background:var(--blue);border:none;color:white;font-family:"Cairo",sans-serif;font-weight:900;font-size:14px;cursor:pointer;padding:12px;border-radius:10px;width:100%}
 
+/* REPLY BAR */
+.reply-bar{background:var(--sur2);border-right:3px solid var(--blue);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:none;align-items:center;justify-content:space-between}
+.reply-bar.vis{display:flex}
+.reply-bar-content{flex:1;min-width:0}
+.reply-bar-name{font-size:11px;color:var(--blue);font-weight:700;margin-bottom:2px}
+.reply-bar-txt{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reply-cancel{background:none;border:none;color:var(--mute);cursor:pointer;font-size:18px;padding:4px;flex-shrink:0}
+.reply-preview-bubble{background:rgba(88,166,255,.1);border-right:3px solid var(--blue);border-radius:6px;padding:6px 9px;margin-bottom:6px;cursor:pointer}
+.me .reply-preview-bubble{background:rgba(255,255,255,.1);border-right-color:rgba(255,255,255,.5)}
+.reply-preview-name{font-size:10px;color:var(--blue);font-weight:700;margin-bottom:2px}
+.me .reply-preview-name{color:rgba(255,255,255,.8)}
+.reply-preview-txt{font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me .reply-preview-txt{color:rgba(255,255,255,.7)}
+
+/* REACTIONS */
+.reactions-wrap{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+.reaction-chip{background:var(--sur2);border:1px solid var(--bdr);border-radius:20px;padding:2px 7px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px;transition:all .15s}
+.reaction-chip:hover{border-color:var(--blue)}
+.reaction-chip.mine{background:rgba(88,166,255,.15);border-color:var(--blue)}
+.reaction-chip .rc{font-size:14px}
+.reaction-chip .rn{font-size:11px;color:var(--mute)}
+.emoji-picker-pop{position:absolute;background:var(--sur);border:1px solid var(--bdr);border-radius:14px;padding:8px;display:flex;gap:4px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4);bottom:100%;margin-bottom:6px}
+.ep-emoji{font-size:22px;cursor:pointer;padding:4px;border-radius:8px;transition:background .1s;line-height:1}
+.ep-emoji:hover{background:var(--sur2)}
+
+/* SWIPE HINT */
+.msg-actions{position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px;opacity:0;transition:opacity .2s;pointer-events:none}
+.me .msg-actions{left:-60px}
+.other .msg-actions{right:-60px}
+.mrow:hover .msg-actions{opacity:1;pointer-events:all}
+.act-btn{background:var(--sur2);border:1px solid var(--bdr);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;border:none;color:var(--mute)}
+
 /* VOICE */
 .voice-btn{width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;transition:all .2s;flex-shrink:0}
 .voice-btn.idle{background:var(--sur2)}
@@ -244,6 +276,13 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
   <div class="msgs-area" id="msgs-area"></div>
+  <div class="reply-bar" id="reply-bar">
+    <div class="reply-bar-content">
+      <div class="reply-bar-name" id="rb-name"></div>
+      <div class="reply-bar-txt" id="rb-txt"></div>
+    </div>
+    <button class="reply-cancel" onclick="clearReply()">✕</button>
+  </div>
   <div class="inp-area">
     <button class="abtn" onclick="document.getElementById('finp').click()">📎</button>
     <input type="file" id="finp" accept="image/*" style="display:none" onchange="handleFile(this)">
@@ -514,7 +553,40 @@ function goBack(){
 function loadMsgs(cid){
   G("msgs-area").innerHTML='<div class="empty"><div class="ei" style="font-size:32px">⏳</div></div>';
   SB.from("messages").select("*").eq("conversation_id",cid).order("created_at",{ascending:true}).then(function(r){
-    MSGS=r.data||[];renderMsgs();scrollD();
+    MSGS=r.data||[];
+    renderMsgs();scrollD();
+    loadReactions(cid);
+  });
+}
+function loadReactions(cid){
+  // Load all reactions for this conversation's messages
+  var msgIds=MSGS.map(function(m){return m.id;});
+  if(!msgIds.length)return;
+  SB.from("reactions").select("*").in("message_id",msgIds).then(function(r){
+    REACTIONS=r.data||[];
+    renderAllReactions();
+  });
+}
+function renderAllReactions(){
+  var grouped={};
+  REACTIONS.forEach(function(r){
+    if(!grouped[r.message_id])grouped[r.message_id]={};
+    if(!grouped[r.message_id][r.emoji])grouped[r.message_id][r.emoji]=[];
+    grouped[r.message_id][r.emoji].push(r.user_id);
+  });
+  Object.keys(grouped).forEach(function(mid){
+    var el=document.getElementById("rxn-"+mid);
+    if(!el)return;
+    el.innerHTML="";
+    Object.keys(grouped[mid]).forEach(function(emoji){
+      var users=grouped[mid][emoji];
+      var isMine=users.indexOf(CU.id)!==-1;
+      var chip=document.createElement("div");
+      chip.className="reaction-chip"+(isMine?" mine":"");
+      chip.innerHTML='<span class="rc">'+emoji+'</span><span class="rn">'+users.length+'</span>';
+      (function(e,m,im){chip.addEventListener("click",function(){toggleReaction(m,e,im);});})(emoji,mid,isMine);
+      el.appendChild(chip);
+    });
   });
 }
 function renderMsgs(){
@@ -564,9 +636,24 @@ function renderMsgs(){
       }
       if(mcontent)body+='<div class="mtxt">'+es(mcontent)+'</div>';
     }
-    html+='<div class="mrow '+(me?"me":"other")+'">'
+    // Reply preview
+    var replyHtml="";
+    if(m.reply_to&&m.reply_preview){
+      replyHtml='<div class="reply-preview-bubble" data-rid="'+m.reply_to+'" onclick="scrollToMsg(this.dataset.rid)">'
+        +'<div class="reply-preview-name">'+(m.reply_sender_name||"رسالة")+'</div>'
+        +'<div class="reply-preview-txt">'+es(m.reply_preview)+'</div></div>';
+    }
+    var rowId="msg-"+m.id;
+    html+='<div class="mrow '+(me?"me":"other")+'" id="'+rowId+'" style="position:relative">'
       +(me?"":'<div class="mav" style="background:'+col(m.sender_id)+'">'+pnm+'</div>')
-      +'<div class="bbl">'+body+'<div class="mtime">'+tm+(me?" · "+(m.is_read?"✓✓":"✓"):"")+'</div></div>'
+      +'<div>'
+      +'<div class="bbl">'+replyHtml+body+'<div class="mtime">'+tm+(me?" · "+(m.is_read?"✓✓":"✓"):"")+'</div></div>'
+      +'<div class="reactions-wrap" id="rxn-'+m.id+'"></div>'
+      +'</div>'
+      +'<div class="msg-actions">'
+      +'<button class="act-btn" data-mid="'+m.id+'" data-mtxt="'+es((mcontent||"").slice(0,60))+'" data-msender="'+es(pnm)+'" onclick="setReply(this)">↩️</button>'
+      +'<button class="act-btn" data-mid="'+m.id+'" onclick="toggleEmojiPicker(this)">😊</button>'
+      +'</div>'
       +(me?'<div class="mav" style="background:'+col(m.sender_id)+'">'+pnm+'</div>':"")
       +'</div>';
   }
@@ -600,7 +687,14 @@ function renderMsgs(){
 function scrollD(){var el=G("msgs-area");if(el){el.scrollTop=el.scrollHeight;}}
 function subChat(cid){
   if(MCH)SB.removeChannel(MCH);
-  MCH=SB.channel("mc"+cid).on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"conversation_id=eq."+cid},function(p){
+  MCH=SB.channel("mc"+cid)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"reactions"},function(){
+      if(CONV)loadReactions(CONV.id);
+    })
+    .on("postgres_changes",{event:"DELETE",schema:"public",table:"reactions"},function(){
+      if(CONV)loadReactions(CONV.id);
+    })
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"conversation_id=eq."+cid},function(p){
     var m=p.new;
     if(!m)return;
     var found=false;
@@ -623,6 +717,8 @@ function sendMsg(){
   if(!text&&!PF)return;
   if(!CONV)return;
   var data={conversation_id:CONV.id,sender_id:CU.id,content:text||null};
+  if(replyToMsg){data.reply_to=replyToMsg.id;data.reply_preview=replyToMsg.preview;}
+  clearReply();
   G("minp").value="";G("minp").style.height="auto";
   if(PF){
     var file=PF;PF=null;G("finp").value="";
@@ -1320,6 +1416,81 @@ function answerQuiz(picked){
 }
 function nextQuizQ(){renderQuiz();}
 function closeQuiz(){document.getElementById("quiz-modal").classList.remove("open");}
+
+// ── REPLY ──
+var replyToMsg=null;
+var REACTIONS=[];
+function setReply(btn){
+  var mid=btn.getAttribute("data-mid");
+  var mtxt=btn.getAttribute("data-mtxt");
+  var msender=btn.getAttribute("data-msender");
+  replyToMsg={id:mid,preview:mtxt,senderName:msender};
+  G("rb-name").textContent=msender;
+  G("rb-txt").textContent=mtxt;
+  G("reply-bar").classList.add("vis");
+  G("minp").focus();
+}
+function clearReply(){
+  replyToMsg=null;
+  G("reply-bar").classList.remove("vis");
+}
+function scrollToMsg(mid){
+  var el=document.getElementById("msg-"+mid);
+  if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.style.background="rgba(88,166,255,.1)";setTimeout(function(){el.style.background="";},1500);}
+}
+
+// ── REACTIONS ──
+var activeEmojiPicker=null;
+var EMOJIS=["❤️","😂","😮","😢","👍","🔥","🙏","💯"];
+function toggleEmojiPicker(btn){
+  // Close existing picker
+  if(activeEmojiPicker){activeEmojiPicker.remove();activeEmojiPicker=null;return;}
+  var mid=btn.getAttribute("data-mid");
+  var picker=document.createElement("div");
+  picker.className="emoji-picker-pop";
+  EMOJIS.forEach(function(emoji){
+    var eb=document.createElement("button");
+    eb.className="ep-emoji";eb.textContent=emoji;
+    eb.addEventListener("click",function(){
+      addReaction(mid,emoji);
+      picker.remove();activeEmojiPicker=null;
+    });
+    picker.appendChild(eb);
+  });
+  btn.parentElement.appendChild(picker);
+  activeEmojiPicker=picker;
+  setTimeout(function(){
+    document.addEventListener("click",function closeP(e){
+      if(!picker.contains(e.target)&&e.target!==btn){picker.remove();activeEmojiPicker=null;document.removeEventListener("click",closeP);}
+    });
+  },100);
+}
+function addReaction(msgId,emoji){
+  // Check if already reacted with this emoji
+  var existing=REACTIONS.find(function(r){return r.message_id===msgId&&r.user_id===CU.id&&r.emoji===emoji;});
+  if(existing){
+    // Remove reaction
+    SB.from("reactions").delete().eq("id",existing.id).then(function(){
+      REACTIONS=REACTIONS.filter(function(r){return r.id!==existing.id;});
+      renderAllReactions();
+    });
+  }else{
+    // Remove any existing reaction from this user on this message
+    SB.from("reactions").delete().eq("message_id",msgId).eq("user_id",CU.id).then(function(){
+      // Add new reaction
+      SB.from("reactions").insert([{message_id:msgId,user_id:CU.id,emoji:emoji}]).select().single().then(function(r){
+        if(r.data){
+          REACTIONS=REACTIONS.filter(function(rx){return !(rx.message_id===msgId&&rx.user_id===CU.id);});
+          REACTIONS.push(r.data);
+          renderAllReactions();
+        }
+      });
+    });
+  }
+}
+function toggleReaction(msgId,emoji,isMine){
+  addReaction(msgId,emoji);
+}
 
 // ── INIT ──
 showPage("pg-auth");
