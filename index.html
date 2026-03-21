@@ -345,7 +345,7 @@ function switchTab(t){
   document.querySelectorAll(".tab").forEach((b,i)=>b.classList.toggle("on",["l","r"][i]===t));
 }
 function showErr(id,msg){var e=$(id);e.textContent=msg;e.style.display="block";setTimeout(()=>e.style.display="none",4000);}
-function setBtn(id,busy,lbl){var b=$(id);b.disabled=busy;b.innerHTML=busy?"<span class='spin'></span>":lbl;}
+function setBtn(id,busy,lbl){var b=$(id);b.disabled=busy;b.innerHTML=busy?"<span class='spin'></span> جاري التحقق...":lbl;}
 
 async function doLogin(){
   var em=$("l-em").value.trim(),pw=$("l-pw").value;
@@ -353,7 +353,8 @@ async function doLogin(){
   setBtn("l-btn",true,"دخول");
   var r=await sb.auth.signInWithPassword({email:em,password:pw});
   setBtn("l-btn",false,"دخول");
-  if(r.error)showErr("l-err","بيانات غير صحيحة");
+  if(r.error){showErr("l-err","بيانات غير صحيحة");return;}
+  if(r.data?.user) await launch(r.data.user);
 }
 async function doReg(){
   var nm=$("r-nm").value.trim(),em=$("r-em").value.trim(),pw=$("r-pw").value,pw2=$("r-pw2").value;
@@ -363,8 +364,9 @@ async function doReg(){
   setBtn("r-btn",true,"إنشاء حساب");
   var r=await sb.auth.signUp({email:em,password:pw,options:{data:{full_name:nm}}});
   setBtn("r-btn",false,"إنشاء حساب");
-  if(r.error)showErr("r-err",r.error.message);
-  else await sb.from("profiles").upsert({id:r.data.user.id,full_name:nm,email:em});
+  if(r.error){showErr("r-err",r.error.message);return;}
+  await sb.from("profiles").upsert({id:r.data.user.id,full_name:nm,email:em});
+  if(r.data?.user) await launch(r.data.user);
 }
 async function doLogout(){
   if(!confirm("تسجيل الخروج؟"))return;
