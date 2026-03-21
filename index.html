@@ -483,7 +483,7 @@ function renderConvs(){
     var p=getP(oid);var nm=p.full_name||p.email||"مستخدم";
     html+='<div class="citem" data-i="'+i+'"><div class="cav" style="background:'+col(oid)+'">'+nm[0].toUpperCase()+'</div>'
       +'<div class="cinfo"><div class="cname">'+es(nm)+'</div>'
-      +'<div class="clast">'+es(c.last_message||"ابدأ المحادثة...")+'</div></div>'
+      +'<div class="clast">'+es(c.last_message||c.last_msg||"ابدأ المحادثة...")+'</div></div>'
       +'<div class="ctime">'+ft(c.last_message_at)+'</div></div>';
   }
   el.innerHTML=html;
@@ -527,11 +527,24 @@ function renderMsgs(){
     if(ds!==ld){html+='<div class="dsep">'+ds+'</div>';ld=ds;}
     var tm=d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");
     var body="";
-    var mtype=m.msg_type||"text";
-    if(mtype==="voice"&&m.file_url){
-      body+='<div class="voice-msg"><button class="play-btn vplay" data-url="'+es(m.file_url)+'">▶</button><div class="voice-wave"></div><span class="voice-dur">'+(m.extra&&m.extra.dur?m.extra.dur+"ث":"")+'</span></div>';
-    } else if(mtype==="game"){
-      var ex=m.extra||{};
+    // Parse extension field: can be url, or url|type:voice|extra:{...}
+    var mtype="text";var mFileUrl=null;var mExtra={};
+    if(m.extension){
+      var parts=m.extension.split("|");
+      mFileUrl=parts[0]||null;
+      for(var pi=1;pi<parts.length;pi++){
+        if(parts[pi].indexOf("type:")=== 0)mtype=parts[pi].slice(5);
+        if(parts[pi].indexOf("extra:")===0){try{mExtra=JSON.parse(parts[pi].slice(6));}catch(e){}}
+      }
+    }
+    if(m.msg_type)mtype=m.msg_type;
+    if(m.file_url)mFileUrl=m.file_url;
+    if(m.extra)mExtra=m.extra;
+    var mcontent=m.topic||m.content||"";
+    if(mtype==="voice"&&mFileUrl){
+      body+='<div class="voice-msg"><button class="play-btn vplay" data-url="'+es(mFileUrl)+'">▶</button><div class="voice-wave"></div><span class="voice-dur">'+(mExtra.dur?mExtra.dur+"ث":"")+'</span></div>';
+    } else if(mtype==="game"||mtype==="xo"){
+      var ex=mExtra||m.extra||{};
       var typeNames={"quiz":"❓ أسئلة وأجوبة","xo":"⭕ لعبة XO","dare":"🎯 جرأة أو حقيقة","custom":"✏️ تحدي مخصص"};
       if(ex.type==="xo-started"){
         // Game already started - show join button for both
@@ -553,13 +566,13 @@ function renderMsgs(){
       }
     } else {
       if(m.file_url){
-        if(m.file_type&&m.file_type.slice(0,5)==="image"){
-          body+='<img class="mimg" src="'+es(m.file_url)+'" onclick="openImg(this.src)" loading="lazy">';
+        if(mFileUrl&&m.extension&&m.extension.indexOf("image")!==-1){
+          body+='<img class="mimg" src="'+es(mFileUrl)+'" onclick="openImg(this.src)" loading="lazy">';
         }else{
-          body+='<a href="'+es(m.file_url)+'" target="_blank" style="color:'+(me?"#fff":"var(--blue)")+';font-size:12px">📎 '+(m.file_name||"ملف")+'</a>';
+          body+='<a href="'+es(mFileUrl)+'" target="_blank" style="color:'+(me?"#fff":"var(--blue)")+';font-size:12px">📎 ملف</a>';
         }
       }
-      if(m.content)body+='<div class="mtxt">'+es(m.content)+'</div>';
+      if(mcontent)body+='<div class="mtxt">'+es(mcontent)+'</div>';
     }
     html+='<div class="mrow '+(me?"me":"other")+'">'
       +(me?"":'<div class="mav" style="background:'+col(m.sender_id)+'">'+pnm+'</div>')
@@ -619,7 +632,7 @@ function sendMsg(){
   var text=G("minp").value.trim();
   if(!text&&!PF)return;
   if(!CONV)return;
-  var data={conversation_id:CONV.id,sender_id:CU.id,content:text||null};
+  var data={conversation_id:CONV.id,sender_id:CU.id,content:text||null,topic:text||""};
   G("minp").value="";G("minp").style.height="auto";
   if(PF){
     var file=PF;PF=null;G("finp").value="";
@@ -636,17 +649,15 @@ function sendMsg(){
 }
 function insertMsg(data){
   // Clean data - remove undefined/null file fields if not needed
+  // Map to actual DB columns: topic=content, extension=file_url
   var insertData={
     conversation_id:data.conversation_id,
     sender_id:data.sender_id,
-    content:data.content||null,
-    msg_type:data.msg_type||"text",
-    is_read:false
+    topic:data.content||data.topic||"",
   };
-  if(data.file_url)insertData.file_url=data.file_url;
-  if(data.file_type)insertData.file_type=data.file_type;
-  if(data.file_name)insertData.file_name=data.file_name;
-  if(data.extra)insertData.extra=data.extra;
+  if(data.file_url)insertData.extension=data.file_url;
+  if(data.msg_type&&data.msg_type!=="text")insertData.extension=(insertData.extension||"")+"|type:"+data.msg_type;
+  if(data.extra)insertData.extension=(insertData.extension||"")+"|extra:"+JSON.stringify(data.extra);
 
   SB.from("messages").insert([insertData]).select().single().then(function(r){
     if(r.error){T("خطأ في الإرسال: "+r.error.message);return;}
@@ -657,7 +668,7 @@ function insertMsg(data){
       if(!found){MSGS.push(r.data);}
       renderMsgs();scrollD();
     }
-    var lastMsg=data.content||(data.msg_type==="voice"?"🎤 رسالة صوتية":(data.msg_type==="game"?"🎮 تحدي":"📎 ملف"));
+    var lastMsg=data.topic||data.content||(data.msg_type==="voice"?"🎤 رسالة صوتية":(data.msg_type==="game"?"🎮 تحدي":"📎 ملف"));
     if(CONV)SB.from("conversations").update({last_message:lastMsg,last_message_at:new Date().toISOString()}).eq("id",CONV.id).then(function(){});
   });
 }
@@ -1037,7 +1048,7 @@ function uploadVoice(blob,dur,mimeType){
   SB.storage.from("voices").upload(path,blob,{upsert:true,contentType:ct}).then(function(r){
     if(r.error){T("فشل رفع الصوت: "+r.error.message);return;}
     var url=SB.storage.from("voices").getPublicUrl(path).data.publicUrl;
-    insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:null,msg_type:"voice",file_url:url,extra:{dur:dur}});
+    insertMsg({conversation_id:CONV.id,sender_id:CU.id,topic:"🎤 رسالة صوتية",content:"🎤 رسالة صوتية",msg_type:"voice",file_url:url,extra:{dur:dur}});
   });
 }
 var curAudio=null;
