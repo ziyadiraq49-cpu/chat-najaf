@@ -216,8 +216,7 @@ function fTime(ts){
   if(d.toDateString()===n.toDateString())return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");
   return d.getDate()+"/"+(d.getMonth()+1);
 }
-function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/
-/g,"<br>");}
+function esc(s){if(!s)return "";return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");}
 
 // ── AUTH TABS ──
 function swTab(t){
@@ -230,13 +229,24 @@ function swTab(t){
 async function doLogin(){
   var em=$("l-em").value.trim(),pw=$("l-pw").value;
   if(!em||!pw){showErr("l-err","يرجى ملء الحقول");return;}
-  $("l-btn").disabled=true;$("l-btn").textContent="جاري التحقق...";
+  $("l-btn").disabled=true;$("l-btn").textContent="جاري...";
   try{
     var r=await sb.auth.signInWithPassword({email:em,password:pw});
-    if(r.error){showErr("l-err","بيانات غير صحيحة");$("l-btn").disabled=false;$("l-btn").textContent="دخول";return;}
+    $("l-btn").disabled=false;$("l-btn").textContent="دخول";
+    if(r.error){
+      showErr("l-err","خطأ: "+r.error.message);
+      return;
+    }
+    if(!r.data||!r.data.user){
+      showErr("l-err","لم يتم استلام بيانات المستخدم");
+      return;
+    }
     CU=r.data.user;
     await launch();
-  }catch(e){showErr("l-err","حدث خطأ، حاول مجدداً");$("l-btn").disabled=false;$("l-btn").textContent="دخول";}
+  }catch(e){
+    $("l-btn").disabled=false;$("l-btn").textContent="دخول";
+    showErr("l-err","خطأ في الاتصال: "+(e.message||"unknown"));
+  }
 }
 
 // ── REGISTER ──
@@ -367,7 +377,7 @@ function renderMsgs(){
     var content="";
     if(m.file_url){
       if(m.file_type&&m.file_type.indexOf("image")===0){
-        content='<img class="msg-img" src="'+m.file_url+'" onclick="openImg(''+m.file_url+'')" loading="lazy">';
+        content='<img class="msg-img" src="'+m.file_url+'" onclick="openImg(this.src)" loading="lazy">';
       }else{
         content='<a href="'+m.file_url+'" target="_blank" style="color:'+( isMe?"white":"var(--blue)")+';font-size:12px">📎 '+(m.file_name||"ملف")+'</a>';
       }
