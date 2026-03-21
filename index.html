@@ -533,11 +533,24 @@ function renderMsgs(){
     } else if(mtype==="game"){
       var ex=m.extra||{};
       var typeNames={"quiz":"❓ أسئلة وأجوبة","xo":"⭕ لعبة XO","dare":"🎯 جرأة أو حقيقة","custom":"✏️ تحدي مخصص"};
-      body+='<div class="game-card"><div class="game-title">🎮 '+( typeNames[ex.type]||"تحدي")+'</div>'
-        +'<div class="game-desc">'+es(ex.desc||"")+'</div>'
-        +(me?'<div style="font-size:11px;color:var(--mute)">في انتظار الرد...</div>'
-          :'<div class="game-btns"><button class="game-accept gacc" data-mid="'+m.id+'">✅ قبول التحدي</button><button class="game-reject grej" data-mid="'+m.id+'">❌ رفض</button></div>')
-        +'</div>';
+      if(ex.type==="xo-started"){
+        // Game already started - show join button for both
+        var cid=ex.challenger_id,aid=ex.accepter_id;
+        body+='<div class="game-card">'
+          +'<div class="game-title">⭕ جلسة XO نشطة!</div>'
+          +'<div class="game-desc">'+es(ex.desc||"اللعبة جاهزة! اضغط للانضمام")+'</div>'
+          +'<button class="game-play-btn gxo" data-cid="'+cid+'" data-aid="'+aid+'">🎮 العب الآن</button>'
+          +'</div>';
+      } else {
+        var st=ex.status||"pending";
+        body+='<div class="game-card"><div class="game-title">🎮 '+( typeNames[ex.type]||"تحدي")+'</div>'
+          +'<div class="game-desc">'+es(ex.desc||"")+'</div>'
+          +(st==="accepted"?'<div style="font-size:11px;color:#22c55e;font-weight:700">✅ تم القبول</div>'
+            :st==="rejected"?'<div style="font-size:11px;color:#ef4444;font-weight:700">❌ تم الرفض</div>'
+            :me?'<div style="font-size:11px;color:var(--mute)">⏳ في انتظار الرد...</div>'
+            :'<div class="game-btns"><button class="game-accept gacc" data-mid="'+m.id+'">✅ قبول</button><button class="game-reject grej" data-mid="'+m.id+'">❌ رفض</button></div>')
+          +'</div>';
+      }
     } else {
       if(m.file_url){
         if(m.file_type&&m.file_type.slice(0,5)==="image"){
@@ -556,6 +569,12 @@ function renderMsgs(){
   }
   el.innerHTML=html;
   // Add game button events
+  el.querySelectorAll(".gxo").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var cid=btn.getAttribute("data-cid");
+      openXO(cid);
+    });
+  });
   el.querySelectorAll(".gacc").forEach(function(btn){
     btn.addEventListener("click",function(){
       var mid=btn.getAttribute("data-mid");
@@ -1057,11 +1076,16 @@ function acceptGame(msgId){
       if(ur.error){T("خطأ: "+ur.error.message);return;}
       if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"✅ قبلت التحدي! لنبدأ اللعب 🎮",msg_type:"text"});
       if(CONV)loadMsgs(CONV.id);
+      // Send game-start message so BOTH players can join
+      var challengerId=r.data.sender_id;
+      if(CONV&&gameType==="xo"){
+        insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎮 بدأت اللعبة! اضغط 'العب XO' للانضمام",msg_type:"game",extra:{type:"xo-started",challenger_id:challengerId,accepter_id:CU.id,desc:"اللعبة بدأت! كلا اللاعبين يلعبان معاً"}});
+      }
       // Open the game
       setTimeout(function(){
-        if(gameType==="xo")openXO(r.data.sender_id);
+        if(gameType==="xo")openXO(challengerId);
         else if(gameType==="quiz")openQuiz();
-        else if(gameType==="dare"){T("🎯 تحدي الجرأة! انتظر رد المرسل...");insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎯 قبلت تحدي الجرأة! "+ex.desc,msg_type:"text"});}
+        else if(gameType==="dare"){insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"🎯 قبلت تحدي الجرأة! "+ex.desc,msg_type:"text"});}
         else{T("✅ تم قبول التحدي! "+ex.desc);}
       },500);
     });
@@ -1082,15 +1106,21 @@ function rejectGame(msgId){
 
 // ── XO GAME ──
 var xoBoard=[],xoMySymbol="",xoOpSymbol="",xoMyTurn=true,xoGameOver=false;
-function openXO(opponentId){
+function openXO(challengerId){
+  // challengerId = the one who SENT the challenge
+  // If I am the challenger, I get X and go first
+  // If I am the accepter, I get O and go second
   xoBoard=["","","","","","","","",""];
   xoGameOver=false;
-  // First player (challenger) gets X, second gets O
-  xoMySymbol=CU.id<opponentId?"X":"O";
-  xoOpSymbol=xoMySymbol==="X"?"O":"X";
-  xoMyTurn=xoMySymbol==="X";
-  document.getElementById("xo-my-sym").textContent=xoMySymbol==="X"?"❌":"⭕";
-  document.getElementById("xo-op-sym").textContent=xoOpSymbol==="X"?"❌":"⭕";
+  var iAmChallenger=(CU.id===challengerId);
+  xoMySymbol=iAmChallenger?"X":"O";
+  xoOpSymbol=iAmChallenger?"O":"X";
+  xoMyTurn=iAmChallenger; // X goes first
+  var myDisp=xoMySymbol==="X"?"❌":"⭕";
+  var opDisp=xoOpSymbol==="X"?"❌":"⭕";
+  document.getElementById("xo-my-sym").textContent=myDisp;
+  document.getElementById("xo-op-sym").textContent=opDisp;
+  document.getElementById("xo-status").textContent=xoMyTurn?"دورك أنت "+myDisp:"دور المنافس... ⏳";
   renderXO();
   document.getElementById("xo-modal").classList.add("open");
 }
