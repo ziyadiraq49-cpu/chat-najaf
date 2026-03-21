@@ -372,7 +372,13 @@ function sendMsg(){
   }else{insertMsg(data);}
 }
 function insertMsg(data){
-  SB.from("messages").insert([data]).then(function(){
+  SB.from("messages").insert([data]).select().single().then(function(r){
+    if(r.data){
+      // Add to local array immediately
+      var found=false;
+      for(var i=0;i<MSGS.length;i++){if(MSGS[i].id===r.data.id){found=true;break;}}
+      if(!found){MSGS.push(r.data);renderMsgs();scrollD();}
+    }
     SB.from("conversations").update({last_message:data.content||"📎 ملف",last_message_at:new Date().toISOString()}).eq("id",CONV.id).then(function(){});
   });
 }
