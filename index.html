@@ -354,7 +354,7 @@ body{display:flex;flex-direction:column}
   <div class="sbox">
     <div class="shandle"></div>
     <div class="stitle">محادثة جديدة</div>
-    <input class="sinp" id="sinp" type="text" placeholder="ابحث بالاسم (3 أحرف على الأقل)..." oninput="doSearch()">
+    <input class="sinp" id="sinp" type="text" placeholder="@معرف المستخدم..." oninput="doSearch()" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div id="sres"><div class="empty" style="padding:16px"><div class="ei" style="font-size:32px">🔍</div><div style="font-size:13px">ابحث عن مستخدم</div></div></div>
   </div>
 </div>
@@ -382,9 +382,14 @@ body{display:flex;flex-direction:column}
     <div class="prof-edit-card">
       <div style="font-size:14px;font-weight:900;margin-bottom:4px">معلومات الحساب</div>
       <div><label class="pflbl">الاسم الكامل</label><input class="pfinp" id="pf-name" type="text" placeholder="اسمك الكامل"></div>
-      <div><label class="pflbl">المعرف @username</label>
-        <div style="position:relative"><span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--mute);font-size:14px">@</span>
-        <input class="pfinp" id="pf-username" type="text" placeholder="معرفك الخاص" style="padding-right:30px" autocomplete="off"></div>
+      <div>
+        <label class="pflbl">المعرف @username <span style="color:var(--blue);font-size:10px">(يستخدمه الآخرون للعثور عليك)</span></label>
+        <div style="position:relative">
+          <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--mute);font-size:14px">@</span>
+          <input class="pfinp" id="pf-username" type="text" placeholder="اختر معرفاً فريداً" style="padding-right:30px;padding-left:44px" autocomplete="off" autocorrect="off" autocapitalize="off">
+          <button onclick="copyUsername()" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--blue);cursor:pointer;font-size:13px;padding:4px" title="نسخ المعرف">📋</button>
+        </div>
+        <div style="font-size:11px;color:var(--dim);margin-top:4px">استخدم أحرف إنجليزية وأرقام وشرطة سفلية فقط</div>
       </div>
       <div><label class="pflbl">السيرة الذاتية</label><textarea class="pfinp" id="pf-bio" rows="3" placeholder="نبذة عنك..." style="resize:none;line-height:1.6"></textarea></div>
     </div>
@@ -873,8 +878,11 @@ G("minp").addEventListener("input",function(){this.style.height="auto";this.styl
 // ── SEARCH ──
 function openSearch(){
   G("pg-search").classList.add("vis");
-  G("sres").innerHTML='<div class="empty" style="padding:16px"><div class="ei" style="font-size:32px">🔍</div><div style="font-size:13px">ابحث عن مستخدم</div></div>';
   G("sinp").value="";
+  G("sres").innerHTML='<div class="empty" style="padding:20px">'
+    +'<div style="font-size:40px;margin-bottom:10px">🔒</div>'
+    +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">البحث بالمعرف الخاص</div>'
+    +'<div style="font-size:12px;color:var(--mute);line-height:1.7">للخصوصية، لا تظهر الحسابات للعامة.<br>اطلب من صديقك مشاركة معرفه <span style="color:var(--blue)">@username</span><br>من صفحة ملفه الشخصي.</div></div>';
   setTimeout(function(){G("sinp").focus();},200);
 }
 function closeSearch(){G("pg-search").classList.remove("vis");}
@@ -883,23 +891,46 @@ function doSearch(){
   if(ST)clearTimeout(ST);
   ST=setTimeout(function(){
     var q=G("sinp").value.trim();
-    if(q.length<3){G("sres").innerHTML='<div class="empty" style="padding:16px"><div style="font-size:13px;color:var(--dim)">اكتب 3 أحرف على الأقل</div></div>';return;}
+    // Remove @ if present
+    var rawQ=q.startsWith("@")?q.slice(1):q;
+    if(rawQ.length<3){
+      G("sres").innerHTML='<div class="empty" style="padding:20px">'
+        +'<div style="font-size:32px;margin-bottom:8px">🔍</div>'
+        +'<div style="font-size:13px;color:var(--mute)">اكتب @معرف المستخدم للبحث</div>'
+        +'<div style="font-size:11px;color:var(--dim);margin-top:6px">مثال: @ali123</div></div>';
+      return;
+    }
     G("sres").innerHTML='<div style="text-align:center;padding:14px;color:var(--mute)">جاري البحث...</div>';
-    SB.from("profiles").select("id,full_name,email").neq("id",CU.id).ilike("full_name","%"+q+"%").limit(8).then(function(r){
-      var list=r.data||[];
-      if(!list.length){G("sres").innerHTML='<div class="empty" style="padding:16px"><div style="font-size:13px">لم يتم إيجاد مستخدم</div></div>';return;}
-      var html="";
-      for(var i=0;i<list.length;i++){
-        var p=list[i];var nm=p.full_name||"مستخدم";
-        html+='<div class="urow" data-i="'+i+'"><div class="uav" style="background:'+col(p.id)+'">'+nm[0].toUpperCase()+'</div>'
-          +'<div><div style="font-size:14px;font-weight:700">'+es(nm)+'</div>'
-          +'<div style="font-size:12px;color:var(--mute)">'+es(p.email||"")+'</div></div></div>';
-      }
-      G("sres").innerHTML=html;
-      G("sres").querySelectorAll(".urow").forEach(function(row){
-        row.addEventListener("click",function(){closeSearch();startConv(list[parseInt(row.dataset.i)]);});
+    // Search ONLY by username field - exact or starts-with
+    SB.from("profiles").select("id,full_name,username")
+      .neq("id",CU.id)
+      .ilike("username",rawQ+"%")
+      .limit(5)
+      .then(function(r){
+        var list=r.data||[];
+        if(!list.length){
+          G("sres").innerHTML='<div class="empty" style="padding:20px">'
+            +'<div style="font-size:32px;margin-bottom:8px">😕</div>'
+            +'<div style="font-size:13px">لم يتم إيجاد مستخدم بهذا المعرف</div>'
+            +'<div style="font-size:11px;color:var(--dim);margin-top:6px">تأكد من كتابة المعرف بشكل صحيح</div></div>';
+          return;
+        }
+        var html="";
+        for(var i=0;i<list.length;i++){
+          var p=list[i];
+          var nm=p.full_name||"مستخدم";
+          var uname=p.username?"@"+p.username:"";
+          html+='<div class="urow" data-i="'+i+'">'
+            +'<div class="uav" style="background:'+col(p.id)+'">'+nm[0].toUpperCase()+'</div>'
+            +'<div><div style="font-size:14px;font-weight:700">'+es(nm)+'</div>'
+            +'<div style="font-size:12px;color:var(--blue);font-weight:700">'+es(uname)+'</div></div>'
+            +'<div style="font-size:11px;color:var(--grn)">+ محادثة</div></div>';
+        }
+        G("sres").innerHTML=html;
+        G("sres").querySelectorAll(".urow").forEach(function(row){
+          row.addEventListener("click",function(){closeSearch();startConv(list[parseInt(row.dataset.i)]);});
+        });
       });
-    });
   },400);
 }
 function startConv(profile){
@@ -1943,6 +1974,20 @@ function addReaction(msgId,emoji){
 }
 function toggleReaction(msgId,emoji,isMine){
   addReaction(msgId,emoji);
+}
+
+function copyUsername(){
+  var un=G("pf-username").value.trim();
+  if(!un){T("أدخل معرفاً أولاً");return;}
+  var text="@"+un;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(function(){T("✅ تم نسخ المعرف: "+text);}).catch(function(){fallbackCopy(text);});
+  }else{fallbackCopy(text);}
+}
+function fallbackCopy(text){
+  var ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.opacity="0";
+  document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);
+  T("✅ تم نسخ المعرف: "+text);
 }
 
 // ── INIT ──
