@@ -868,25 +868,47 @@ function showProfMsg(msg,ok){
 var mediaRec=null,audioChunks=[],recStart=0,recTimer=null;
 function startRecord(e){
   e.preventDefault();
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){T("المتصفح لا يدعم التسجيل");return;}
-  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    T("المتصفح لا يدعم التسجيل الصوتي");return;
+  }
+  if(!CONV){T("افتح محادثة أولاً");return;}
+  // Request mic permission explicitly
+  navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(stream){
     audioChunks=[];recStart=Date.now();
-    mediaRec=new MediaRecorder(stream);
-    mediaRec.ondataavailable=function(e){if(e.data.size>0)audioChunks.push(e.data);};
+    // Try webm first, fallback to ogg or mp4
+    var mimeType="audio/webm";
+    if(!MediaRecorder.isTypeSupported("audio/webm")){
+      if(MediaRecorder.isTypeSupported("audio/ogg"))mimeType="audio/ogg";
+      else if(MediaRecorder.isTypeSupported("audio/mp4"))mimeType="audio/mp4";
+      else mimeType="";
+    }
+    var opts=mimeType?{mimeType:mimeType}:{};
+    try{mediaRec=new MediaRecorder(stream,opts);}
+    catch(err){mediaRec=new MediaRecorder(stream);}
+    mediaRec.ondataavailable=function(ev){if(ev.data&&ev.data.size>0)audioChunks.push(ev.data);};
     mediaRec.onstop=function(){
-      var blob=new Blob(audioChunks,{type:"audio/webm"});
+      var type=mediaRec.mimeType||"audio/webm";
+      var blob=new Blob(audioChunks,{type:type});
       var dur=Math.round((Date.now()-recStart)/1000);
-      uploadVoice(blob,dur);
+      if(dur<1){T("التسجيل قصير جداً");stream.getTracks().forEach(function(t){t.stop();});return;}
+      uploadVoice(blob,dur,type);
       stream.getTracks().forEach(function(t){t.stop();});
     };
-    mediaRec.start();
+    mediaRec.start(100);
     G("voice-btn").classList.remove("idle");G("voice-btn").classList.add("recording");
     G("voice-btn").textContent="⏹";
+    T("🎤 جاري التسجيل... ارفع إصبعك للإرسال");
     recTimer=setInterval(function(){
       var s=Math.round((Date.now()-recStart)/1000);
+      G("voice-btn").title=s+"ث";
       if(s>=60)stopRecord({preventDefault:function(){}});
     },1000);
-  }).catch(function(){T("لا يمكن الوصول للميكروفون");});
+  }).catch(function(err){
+    var msg="لا يمكن الوصول للميكروفون";
+    if(err.name==="NotAllowedError")msg="يرجى السماح بالوصول للميكروفون من إعدادات المتصفح";
+    else if(err.name==="NotFoundError")msg="لم يتم العثور على ميكروفون";
+    T(msg);
+  });
 }
 function stopRecord(e){
   e.preventDefault();
@@ -894,11 +916,16 @@ function stopRecord(e){
   if(mediaRec&&mediaRec.state==="recording"){mediaRec.stop();}
   G("voice-btn").classList.remove("recording");G("voice-btn").classList.add("idle");G("voice-btn").textContent="🎤";
 }
-function uploadVoice(blob,dur){
+function uploadVoice(blob,dur,mimeType){
   if(!CONV)return;
-  var path="voices/"+CU.id+"_"+Date.now()+".webm";
-  SB.storage.from("voices").upload(path,blob,{upsert:true,contentType:"audio/webm"}).then(function(r){
-    if(r.error){T("فشل رفع الصوت");return;}
+  var ext="webm";
+  if(mimeType&&mimeType.indexOf("ogg")!==-1)ext="ogg";
+  else if(mimeType&&mimeType.indexOf("mp4")!==-1)ext="mp4";
+  var path="voices/"+CU.id+"_"+Date.now()+"."+ext;
+  var ct=mimeType||"audio/webm";
+  T("⏳ جاري الإرسال...");
+  SB.storage.from("voices").upload(path,blob,{upsert:true,contentType:ct}).then(function(r){
+    if(r.error){T("فشل رفع الصوت: "+r.error.message);return;}
     var url=SB.storage.from("voices").getPublicUrl(path).data.publicUrl;
     insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:null,msg_type:"voice",file_url:url,extra:{dur:dur}});
   });
@@ -930,15 +957,31 @@ function sendGameChallenge(){
   closeGameModal();
 }
 function acceptGame(msgId){
-  SB.from("messages").update({extra:{status:"accepted"}}).eq("id",msgId).then(function(){
-    T("✅ قبلت التحدي! ابدأ اللعب 🎮");
-    insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"✅ قبلت التحدي! لنبدأ 🎮",msg_type:"text"});
+  if(!confirm("قبول التحدي؟"))return;
+  // First get the message to preserve existing extra fields
+  SB.from("messages").select("extra").eq("id",msgId).single().then(function(r){
+    var ex=r.data&&r.data.extra?r.data.extra:{};
+    ex.status="accepted";
+    SB.from("messages").update({extra:ex}).eq("id",msgId).then(function(ur){
+      if(ur.error){T("خطأ: "+ur.error.message);return;}
+      T("✅ قبلت التحدي! ابدأ اللعب 🎮");
+      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"✅ قبلت التحدي! لنبدأ 🎮",msg_type:"text"});
+      // Reload messages to reflect change
+      if(CONV)loadMsgs(CONV.id);
+    });
   });
 }
 function rejectGame(msgId){
-  SB.from("messages").update({extra:{status:"rejected"}}).eq("id",msgId).then(function(){
-    T("❌ رفضت التحدي");
-    insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"❌ رفضت التحدي",msg_type:"text"});
+  if(!confirm("رفض التحدي؟"))return;
+  SB.from("messages").select("extra").eq("id",msgId).single().then(function(r){
+    var ex=r.data&&r.data.extra?r.data.extra:{};
+    ex.status="rejected";
+    SB.from("messages").update({extra:ex}).eq("id",msgId).then(function(ur){
+      if(ur.error){T("خطأ: "+ur.error.message);return;}
+      T("❌ رفضت التحدي");
+      if(CONV)insertMsg({conversation_id:CONV.id,sender_id:CU.id,content:"❌ رفضت التحدي",msg_type:"text"});
+      if(CONV)loadMsgs(CONV.id);
+    });
   });
 }
 
