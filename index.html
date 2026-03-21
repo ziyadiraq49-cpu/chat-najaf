@@ -313,9 +313,17 @@ body{display:flex;flex-direction:column}
     </div>
     <button class="reply-cancel" onclick="clearReply()">✕</button>
   </div>
-  <div class="inp-area">
-    <button class="abtn" onclick="document.getElementById('finp').click()">📎</button>
-    <input type="file" id="finp" accept="image/*" style="display:none" onchange="handleFile(this)">
+  <div class="inp-area" style="position:relative">
+    <button class="abtn" onclick="document.getElementById('finp').click()" title="إرسال صورة">🖼</button>
+    <input type="file" id="finp" accept="image/*,video/*" style="display:none" onchange="handleFile(this)">
+    <div id="img-preview-bar" style="display:none;position:absolute;bottom:100%;right:0;left:0;background:var(--sur);border-top:1px solid var(--bdr);padding:8px 12px;display:none;align-items:center;gap:8px">
+      <img id="img-preview-thumb" style="width:48px;height:48px;border-radius:8px;object-fit:cover">
+      <div style="flex:1;min-width:0">
+        <div id="img-preview-name" style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <div id="img-preview-size" style="font-size:11px;color:var(--mute)"></div>
+      </div>
+      <button onclick="cancelFile()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:18px;padding:4px">✕</button>
+    </div>
     <button class="abtn" onclick="openGameChallenge()" title="تحدي">🎮</button>
     <textarea class="minp" id="minp" placeholder="اكتب رسالة..." rows="1" onkeydown="onKey(event)"></textarea>
     <button class="voice-btn idle" id="voice-btn" title="رسالة صوتية"
@@ -730,10 +738,16 @@ function renderMsgs(){
       }
     } else {
       if(m.file_url){
-        if(mFileUrl&&m.file_type&&m.file_type.indexOf("image")!==-1){
-          body+='<img class="mimg" src="'+es(mFileUrl)+'" onclick="openImg(this.src)" loading="lazy">';
+        var ftype=m.file_type||"";
+    var isImage=ftype.indexOf("image")===0||(mtype==="image");
+    if(mFileUrl&&isImage){
+          body+='<img class="mimg" src="'+es(mFileUrl)+'" onclick="openImg(this.src)" loading="lazy" style="max-width:220px;border-radius:12px;display:block;margin-top:4px;cursor:pointer">';
         }else{
-          body+='<a href="'+es(mFileUrl)+'" target="_blank" style="color:'+(me?"#fff":"var(--blue)")+';font-size:12px">📎 ملف</a>';
+          var fname=m.file_name||"ملف";
+        body+='<a href="'+es(mFileUrl)+'" target="_blank" style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:10px;padding:10px;text-decoration:none;color:'+(me?"white":"var(--txt)")+'">'
+          +'<span style="font-size:24px">📎</span>'
+          +'<div><div style="font-size:12px;font-weight:700">'+es(fname)+'</div>'
+          +'<div style="font-size:10px;opacity:.7">اضغط للتحميل</div></div></a>';
         }
       }
       if(mcontent)body+='<div class="mtxt">'+es(mcontent)+'</div>';
@@ -833,13 +847,18 @@ function sendMsg(){
   G("minp").value="";G("minp").style.height="auto";
   if(PF){
     var file=PF;PF=null;G("finp").value="";
+    // Hide preview bar
+    var bar=G("img-preview-bar");if(bar)bar.style.display="none";
+    T("⏳ جاري رفع الصورة...");
     var ext=(file.name.split(".").pop()||"jpg");
     var path="chat/"+CU.id+"_"+Date.now()+"."+ext;
     SB.storage.from("products").upload(path,file,{upsert:true,contentType:file.type}).then(function(r){
-      if(!r.error){
-        data.file_url=SB.storage.from("products").getPublicUrl(path).data.publicUrl;
-        data.file_type=file.type;data.file_name=file.name;
-      }
+      if(r.error){T("فشل رفع الصورة: "+r.error.message);return;}
+      data.file_url=SB.storage.from("products").getPublicUrl(path).data.publicUrl;
+      data.file_type=file.type;
+      data.file_name=file.name;
+      data.msg_type=file.type.indexOf("image")===0?"image":"file";
+      if(!data.content)data.content=null;
       insertMsg(data);
     });
   }else{insertMsg(data);}
@@ -849,7 +868,7 @@ function insertMsg(data){
   var insertData={
     conversation_id:data.conversation_id,
     sender_id:data.sender_id,
-    content:data.content||data.topic||null,
+    content:data.content||null,
     msg_type:data.msg_type||"text",
     is_read:false
   };
@@ -857,6 +876,9 @@ function insertMsg(data){
   if(data.file_type)insertData.file_type=data.file_type;
   if(data.file_name)insertData.file_name=data.file_name;
   if(data.extra)insertData.extra=data.extra;
+  // reply_to only if column exists (added via SQL)
+  try{if(data.reply_to)insertData.reply_to=data.reply_to;}catch(e){}
+  try{if(data.reply_preview)insertData.reply_preview=data.reply_preview;}catch(e){}
 
   SB.from("messages").insert([insertData]).select().single().then(function(r){
     if(r.error){T("خطأ في الإرسال: "+r.error.message);return;}
@@ -871,7 +893,30 @@ function insertMsg(data){
     if(CONV)SB.from("conversations").update({last_message:lastMsg,last_message_at:new Date().toISOString()}).eq("id",CONV.id).then(function(){});
   });
 }
-function handleFile(inp){if(inp.files&&inp.files[0]){PF=inp.files[0];T("📎 "+PF.name+" — جاهز للإرسال");}}
+function handleFile(inp){
+  if(!inp.files||!inp.files[0])return;
+  PF=inp.files[0];
+  var bar=G("img-preview-bar");
+  var thumb=G("img-preview-thumb");
+  var nm=G("img-preview-name");
+  var sz=G("img-preview-size");
+  nm.textContent=PF.name;
+  sz.textContent=PF.size<1024?PF.size+"B":PF.size<1048576?(PF.size/1024).toFixed(1)+"KB":(PF.size/1048576).toFixed(1)+"MB";
+  if(PF.type.indexOf("image")===0){
+    var reader=new FileReader();
+    reader.onload=function(e){thumb.src=e.target.result;};
+    reader.readAsDataURL(PF);
+    thumb.style.display="block";
+  }else{
+    thumb.style.display="none";
+  }
+  bar.style.display="flex";
+  G("minp").focus();
+}
+function cancelFile(){
+  PF=null;G("finp").value="";
+  var bar=G("img-preview-bar");bar.style.display="none";
+}
 function onKey(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMsg();}}
 G("minp").addEventListener("input",function(){this.style.height="auto";this.style.height=Math.min(this.scrollHeight,100)+"px";});
 
